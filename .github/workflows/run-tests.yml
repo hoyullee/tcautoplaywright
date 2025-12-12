@@ -1,42 +1,39 @@
 name: Run Playwright Tests
 
-# 구글 스프레드시트에서 신호를 받으면 실행
 on:
   repository_dispatch:
     types: [run_playwright_tests]
+  workflow_dispatch:  # 수동 실행 추가
 
 jobs:
   test:
     runs-on: ubuntu-latest
     
     steps:
-      # 1단계: 코드 가져오기
       - name: 체크아웃
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      # 2단계: Python 설치
       - name: Python 3.11 설정
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
       
-      # 3단계: 필요한 도구 설치
       - name: 의존성 설치
         run: |
           pip install playwright requests python-dotenv
           playwright install chromium
       
-      # 4단계: 메인 스크립트 실행
       - name: 테스트 실행
         env:
           LAAS_API_KEY: ${{ secrets.LAAS_API_KEY }}
+          PROJECT_CODE: ${{ secrets.PROJECT_CODE }}
+          PRESET_HASH: ${{ secrets.PRESET_HASH }}
           TEST_CASES: ${{ toJson(github.event.client_payload.test_cases) }}
         run: |
           python main_github.py
       
-      # 5단계: 결과를 GitHub에 저장
       - name: 결과 커밋 및 푸시
         run: |
           git config --global user.name "GitHub Actions Bot"
