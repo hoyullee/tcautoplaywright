@@ -29,7 +29,6 @@ jobs:
           pip install playwright requests python-dotenv
           playwright install chromium
       
-      # ⭐ 새로 추가: 환경변수 디버깅
       - name: 환경변수 확인 (디버깅)
         env:
           LAAS_API_KEY: ${{ secrets.LAAS_API_KEY }}
@@ -59,6 +58,11 @@ jobs:
             echo "❌ PRESET_HASH: 없음"
           fi
           echo "======================================"
+          echo ""
+          echo "🐍 Python에서도 확인:"
+          python3 -c "import os; print(f'LAAS_API_KEY: {\"있음\" if os.environ.get(\"LAAS_API_KEY\") else \"없음\"}')"
+          python3 -c "import os; print(f'PROJECT_CODE: {os.environ.get(\"PROJECT_CODE\", \"없음\")}')"
+          python3 -c "import os; print(f'PRESET_HASH: {\"있음\" if os.environ.get(\"PRESET_HASH\") else \"없음\"}')"
       
       - name: 테스트 실행
         env:
