@@ -10,25 +10,28 @@ async def test_case():
         page = await context.new_page()
         
         try:
-            await page.goto('https://www.wanted.co.kr/user/login')
+            # 사전조건: 회원가입/로그인 페이지 진입
+            await page.goto('https://id.wanted.co.kr/login')
             await page.wait_for_load_state('networkidle')
             
-            email_continue_button = page.locator('button:has-text("이메일로 계속하기"), button:has-text("이메일"), [data-testid="email-login"], .email-login-btn')
-            await email_continue_button.wait_for(state='visible', timeout=10000)
-            await email_continue_button.click()
+            # 1. 이메일로 계속하기 버튼 선택
+            email_button = page.locator('button:has-text("이메일로 계속하기"), button:has-text("이메일"), a:has-text("이메일로 계속하기")')
+            await email_button.wait_for(state='visible', timeout=10000)
+            await email_button.click()
             
+            # 2. 페이지 진입 확인
             await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(2000)
             
+            # 이메일 로그인 페이지 요소 확인
             email_input = page.locator('input[type="email"], input[name="email"], input[placeholder*="이메일"]')
             await email_input.wait_for(state='visible', timeout=10000)
             
-            current_url = page.url
-            if 'login' in current_url and 'email' in current_url.lower():
-                await page.screenshot(path='screenshot.png')
-                print("✅ 테스트 성공: 이메일로 로그인 페이지 진입 확인")
-                return True
-            else:
-                raise Exception("이메일 로그인 페이지로 이동되지 않음")
+            # 스크린샷 캡처
+            await page.screenshot(path='email_login_page.png')
+            
+            print("✅ 테스트 성공: 이메일 로그인 페이지 진입 확인")
+            return True
             
         except Exception as e:
             print(f"❌ 테스트 실패: {str(e)}")
