@@ -32,43 +32,44 @@ logging.basicConfig(
 def generate_playwright_code(test_case):
     """테스트 케이스를 Playwright 코드로 변환"""
     
+    # 기능영역 기반 URL 결정
+    function_area = test_case.get('기능영역', '')
+    
+    if '회원가입' in function_area or '로그인' in function_area:
+        base_url = 'https://id.wanted.co.kr/login'
+    else:
+        base_url = 'https://www.wanted.co.kr/'
+    
     prompt = f"""
-다음 테스트 케이스를 Playwright Python 코드로 변환해주세요:
+🚨 중요: 반드시 {base_url} 를 사용하세요!
+
+테스트 케이스를 Playwright Python 코드로 변환:
 
 **테스트 정보**
 - NO: {test_case.get('NO', '')}
 - 환경: {test_case.get('환경', 'PC')}
 - 기능영역: {test_case.get('기능영역', '')}
+- 시작 URL: {base_url}
 
-**사전조건**
-{test_case.get('사전조건', '없음')}
+**사전조건**: {test_case.get('사전조건', '없음')}
+**확인사항**: {test_case.get('확인사항', '')}
+**기대결과**: {test_case.get('기대결과', '')}
 
-**확인사항**
-{test_case.get('확인사항', '')}
+**필수 요구사항**:
+1. await page.goto('{base_url}') 로 시작 (다른 URL 절대 금지!)
+2. async/await 사용
+3. headless=True
+4. 스크린샷 캡처 (screenshots/test_{test_case.get('NO', '')}_*.png)
+5. 에러 처리 및 타임아웃 30초
 
-**기대결과**
-{test_case.get('기대결과', '')}
+**시작 코드**:
+```python
+await page.goto('{base_url}')
+await page.wait_for_load_state('networkidle')
+```
 
-**요구사항**
-1. async/await 사용
-2. headless=True로 설정
-3. 스크린샷 캡처 포함
-4. 명확한 에러 처리
-5. 반드시 https://www.wanted.co.kr/ 를 기본 URL로 사용할 것
-6. 사전조건에 특정 페이지가 명시되어 있지 않으면 https://www.wanted.co.kr/에서 시작
-7. 기능 영역에 명칭이 입력되어 있는 경우 아래와 매칭된 URL 적용
- - '채용 홈' : https://www.wanted.co.kr/
- - '회원가입/로그인' : https://id.wanted.co.kr/login
-
-코드만 출력하고 추가 설명은 불필요합니다.
+코드만 출력하세요.
 """
-
-    logging.info(f"🔍 API 호출 정보:")
-    logging.info(f"  - API Key 존재: {LAAS_API_KEY is not None}")
-    logging.info(f"  - API Key 길이: {len(LAAS_API_KEY) if LAAS_API_KEY else 0}자")
-    logging.info(f"  - Project Code: {PROJECT_CODE}")
-    logging.info(f"  - Preset Hash 존재: {PRESET_HASH is not None}")
-    logging.info(f"  - Preset Hash 길이: {len(PRESET_HASH) if PRESET_HASH else 0}자")
 
     headers = {
         'apiKey': LAAS_API_KEY,
@@ -89,15 +90,11 @@ def generate_playwright_code(test_case):
     try:
         response = requests.post(LAAS_API_URL, headers=headers, json=payload, timeout=60)
         
-        logging.info(f"📥 API 응답: {response.status_code}")
-        
         if response.status_code == 401:
             logging.error(f"❌ 인증 실패 (401)")
-            logging.error(f"  - 응답: {response.text}")
             return None
         
         response.raise_for_status()
-        
         result = response.json()
         code = result['choices'][0]['message']['content']
         
@@ -108,6 +105,8 @@ def generate_playwright_code(test_case):
             code = code.split('```')[1].split('```')[0].strip()
         
         logging.info(f"✅ 코드 생성 성공 ({len(code)}자)")
+        logging.info(f"   사용된 기본 URL: {base_url}")
+        
         return code
     
     except requests.exceptions.HTTPError as e:
