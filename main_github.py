@@ -6,10 +6,10 @@ from datetime import datetime
 from pathlib import Path
 
 # ========== 설정 ==========
-LAAS_API_KEY = os.environ.get('128fdaef23493311666005a94cccb7e75f1b6a127f8c0330577eac89e7dd2767')
+LAAS_API_KEY = os.environ.get('LAAS_API_KEY')  # ⭐ 수정
+PROJECT_CODE = os.environ.get('PROJECT_CODE')  # ⭐ 수정
+PRESET_HASH = os.environ.get('PRESET_HASH')    # ⭐ 수정
 LAAS_API_URL = 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions'
-PROJECT_CODE = os.environ.get('0fcabc0b9e')
-PRESET_HASH = os.environ.get('888aa18dddcd5d6db56e96a39f13813d74d0962e8a5251a4f8e7a3468a7e825f')
 
 # 디렉토리 생성
 Path('generated_codes').mkdir(exist_ok=True)
@@ -28,7 +28,7 @@ logging.basicConfig(
     ]
 )
 
-# ========== LaaS API 호출 (디버깅 버전) ==========
+# ========== LaaS API 호출 ==========
 def generate_playwright_code(test_case):
     """테스트 케이스를 Playwright 코드로 변환"""
     
@@ -58,15 +58,12 @@ def generate_playwright_code(test_case):
 코드만 출력하고 추가 설명은 불필요합니다.
 """
 
-    # ⭐ 디버깅: 환경변수 확인
-    logging.info(f"🔍 API 호출 전 환경변수 확인:")
+    logging.info(f"🔍 API 호출 정보:")
     logging.info(f"  - API Key 존재: {LAAS_API_KEY is not None}")
     logging.info(f"  - API Key 길이: {len(LAAS_API_KEY) if LAAS_API_KEY else 0}자")
-    logging.info(f"  - API Key 시작: {LAAS_API_KEY[:10] if LAAS_API_KEY else 'None'}...")
     logging.info(f"  - Project Code: {PROJECT_CODE}")
     logging.info(f"  - Preset Hash 존재: {PRESET_HASH is not None}")
     logging.info(f"  - Preset Hash 길이: {len(PRESET_HASH) if PRESET_HASH else 0}자")
-    logging.info(f"  - Preset Hash 시작: {PRESET_HASH[:15] if PRESET_HASH else 'None'}...")
 
     headers = {
         'apiKey': LAAS_API_KEY,
@@ -84,26 +81,14 @@ def generate_playwright_code(test_case):
         ]
     }
     
-    # ⭐ 디버깅: 요청 정보 로그
-    logging.info(f"📤 API 요청:")
-    logging.info(f"  - URL: {LAAS_API_URL}")
-    logging.info(f"  - Headers: {headers}")
-    logging.info(f"  - Payload keys: {list(payload.keys())}")
-    
     try:
         response = requests.post(LAAS_API_URL, headers=headers, json=payload, timeout=60)
         
-        # ⭐ 디버깅: 응답 정보 로그
-        logging.info(f"📥 API 응답:")
-        logging.info(f"  - Status Code: {response.status_code}")
-        logging.info(f"  - Response Headers: {dict(response.headers)}")
-        logging.info(f"  - Response Body: {response.text[:500]}")  # 처음 500자만
+        logging.info(f"📥 API 응답: {response.status_code}")
         
-        # 401 에러인 경우 상세 정보
         if response.status_code == 401:
-            logging.error(f"❌ 인증 실패 (401 Unauthorized)")
-            logging.error(f"  - 전체 응답: {response.text}")
-            logging.error(f"  - 요청 헤더: {headers}")
+            logging.error(f"❌ 인증 실패 (401)")
+            logging.error(f"  - 응답: {response.text}")
             return None
         
         response.raise_for_status()
@@ -123,7 +108,7 @@ def generate_playwright_code(test_case):
     except requests.exceptions.HTTPError as e:
         logging.error(f"❌ HTTP 에러: {e}")
         if 'response' in locals():
-            logging.error(f"  - 응답 본문: {response.text}")
+            logging.error(f"  - 응답: {response.text}")
         return None
     except Exception as e:
         logging.error(f"❌ 예외 발생: {type(e).__name__}: {e}")
@@ -135,13 +120,11 @@ def main():
     logging.info("🚀 Playwright 자동화 테스트 시작")
     logging.info("=" * 60)
     
-    # ⭐ 환경변수 상세 확인
     logging.info(f"🔐 환경변수 검증:")
     logging.info(f"  - LAAS_API_KEY: {'✅ 설정됨' if LAAS_API_KEY else '❌ 없음'}")
     logging.info(f"  - PROJECT_CODE: {'✅ 설정됨' if PROJECT_CODE else '❌ 없음'} (값: {PROJECT_CODE})")
     logging.info(f"  - PRESET_HASH: {'✅ 설정됨' if PRESET_HASH else '❌ 없음'}")
     
-    # 환경변수 누락 체크
     if not LAAS_API_KEY:
         logging.error("❌ LAAS_API_KEY가 설정되지 않았습니다!")
         return
@@ -188,7 +171,6 @@ def main():
         logging.info(f"📝 테스트 케이스 {test_no} 처리 중...")
         logging.info(f"{'='*60}")
         
-        # 코드 생성
         logging.info("🤖 LaaS API로 Playwright 코드 생성 중...")
         generated_code = generate_playwright_code(test_case)
         
