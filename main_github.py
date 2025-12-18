@@ -50,12 +50,15 @@ def generate_playwright_code(test_case):
 {test_case.get('기대결과', '')}
 
 **요구사항**
-1. 반드시 https://www.wanted.co.kr/ 를 기본 URL로 사용할 것
-2. 사전조건에 특정 페이지가 명시되어 있지 않으면 https://www.wanted.co.kr/에서 시작
-3. async/await 사용
-4. headless=True로 설정
-5. 스크린샷 캡처 포함
-6. 명확한 에러 처리
+1. async/await 사용
+2. headless=True로 설정
+3. 스크린샷 캡처 포함
+4. 명확한 에러 처리
+5. 반드시 https://www.wanted.co.kr/ 를 기본 URL로 사용할 것
+6. 사전조건에 특정 페이지가 명시되어 있지 않으면 https://www.wanted.co.kr/에서 시작
+7. 기능 영역에 명칭이 입력되어 있는 경우 아래와 매칭된 URL 적용
+ - '채용 홈' : https://www.wanted.co.kr/
+ - '회원가입/로그인' : https://id.wanted.co.kr/login
 
 코드만 출력하고 추가 설명은 불필요합니다.
 """
