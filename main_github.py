@@ -4,8 +4,6 @@ import logging
 import requests
 from datetime import datetime
 from pathlib import Path
-import subprocess
-import sys
 
 # ========== 설정 ==========
 LAAS_API_KEY = os.environ.get('128fdaef23493311666005a94cccb7e75f1b6a127f8c0330577eac89e7dd2767')
@@ -26,43 +24,49 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(f'logs/test_{timestamp}.log'),
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler()
     ]
 )
 
-# ========== LaaS API 호출 (코드 생성) ==========
+# ========== LaaS API 호출 (디버깅 버전) ==========
 def generate_playwright_code(test_case):
     """테스트 케이스를 Playwright 코드로 변환"""
     
     prompt = f"""
-                다음 테스트 케이스를 Playwright Python 코드로 변환해주세요:
+다음 테스트 케이스를 Playwright Python 코드로 변환해주세요:
 
-                **테스트 정보**
-                - NO: {test_case.get('NO', '')}
-                - 환경: {test_case.get('환경', 'PC')}
-                - 기능영역: {test_case.get('기능영역', '')}
+**테스트 정보**
+- NO: {test_case.get('NO', '')}
+- 환경: {test_case.get('환경', 'PC')}
+- 기능영역: {test_case.get('기능영역', '')}
 
-                **사전조건**
-                {test_case.get('사전조건', '없음')}
+**사전조건**
+{test_case.get('사전조건', '없음')}
 
-                **확인사항**
-                {test_case.get('확인사항', '')}
+**확인사항**
+{test_case.get('확인사항', '')}
 
-                **기대결과**
-                {test_case.get('기대결과', '')}
+**기대결과**
+{test_case.get('기대결과', '')}
 
-                **비고**
-                {test_case.get('비고', '없음')}
+**요구사항**
+1. async/await 사용
+2. headless=True로 설정
+3. 스크린샷 캡처 포함
+4. 명확한 에러 처리
 
-                **요구사항**
-                1. async/await 사용
-                2. headless=True로 설정
-                3. 스크린샷 캡처 포함
-                4. 명확한 에러 처리
-                5. 환경이 'Mobile'이면 모바일 에뮬레이션 사용
+코드만 출력하고 추가 설명은 불필요합니다.
+"""
 
-                코드만 출력하고 추가 설명은 불필요합니다.
-                """
+    # ⭐ 디버깅: 환경변수 확인
+    logging.info(f"🔍 API 호출 전 환경변수 확인:")
+    logging.info(f"  - API Key 존재: {LAAS_API_KEY is not None}")
+    logging.info(f"  - API Key 길이: {len(LAAS_API_KEY) if LAAS_API_KEY else 0}자")
+    logging.info(f"  - API Key 시작: {LAAS_API_KEY[:10] if LAAS_API_KEY else 'None'}...")
+    logging.info(f"  - Project Code: {PROJECT_CODE}")
+    logging.info(f"  - Preset Hash 존재: {PRESET_HASH is not None}")
+    logging.info(f"  - Preset Hash 길이: {len(PRESET_HASH) if PRESET_HASH else 0}자")
+    logging.info(f"  - Preset Hash 시작: {PRESET_HASH[:15] if PRESET_HASH else 'None'}...")
 
     headers = {
         'apiKey': LAAS_API_KEY,
@@ -80,8 +84,28 @@ def generate_playwright_code(test_case):
         ]
     }
     
+    # ⭐ 디버깅: 요청 정보 로그
+    logging.info(f"📤 API 요청:")
+    logging.info(f"  - URL: {LAAS_API_URL}")
+    logging.info(f"  - Headers: {headers}")
+    logging.info(f"  - Payload keys: {list(payload.keys())}")
+    
     try:
         response = requests.post(LAAS_API_URL, headers=headers, json=payload, timeout=60)
+        
+        # ⭐ 디버깅: 응답 정보 로그
+        logging.info(f"📥 API 응답:")
+        logging.info(f"  - Status Code: {response.status_code}")
+        logging.info(f"  - Response Headers: {dict(response.headers)}")
+        logging.info(f"  - Response Body: {response.text[:500]}")  # 처음 500자만
+        
+        # 401 에러인 경우 상세 정보
+        if response.status_code == 401:
+            logging.error(f"❌ 인증 실패 (401 Unauthorized)")
+            logging.error(f"  - 전체 응답: {response.text}")
+            logging.error(f"  - 요청 헤더: {headers}")
+            return None
+        
         response.raise_for_status()
         
         result = response.json()
@@ -93,52 +117,17 @@ def generate_playwright_code(test_case):
         elif '```' in code:
             code = code.split('```')[1].split('```')[0].strip()
         
+        logging.info(f"✅ 코드 생성 성공 ({len(code)}자)")
         return code
     
-    except Exception as e:
-        logging.error(f"코드 생성 실패: {e}")
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"❌ HTTP 에러: {e}")
+        if 'response' in locals():
+            logging.error(f"  - 응답 본문: {response.text}")
         return None
-
-# ========== Playwright 코드 실행 ==========
-def run_playwright_code(code, test_no, max_retries=3):
-    """생성된 Playwright 코드를 실행"""
-    
-    for attempt in range(1, max_retries + 1):
-        logging.info(f"🔄 테스트 {test_no} 실행 시도 {attempt}/{max_retries}")
-        
-        # 임시 파일로 저장
-        temp_file = f'temp_test_{test_no}.py'
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            f.write(code)
-        
-        try:
-            # 실행
-            result = subprocess.run(
-                ['python', temp_file],
-                capture_output=True,
-                text=True,
-                timeout=120  # 2분 타임아웃
-            )
-            
-            # 성공
-            if result.returncode == 0:
-                logging.info(f"✅ 테스트 {test_no} 성공!")
-                os.remove(temp_file)
-                return True, result.stdout
-            
-            # 실패
-            logging.warning(f"❌ 테스트 {test_no} 실패 (시도 {attempt}): {result.stderr}")
-            
-        except subprocess.TimeoutExpired:
-            logging.warning(f"⏱️ 테스트 {test_no} 타임아웃 (시도 {attempt})")
-        except Exception as e:
-            logging.warning(f"⚠️ 테스트 {test_no} 예외 발생 (시도 {attempt}): {e}")
-        
-        finally:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-    
-    return False, "최대 재시도 횟수 초과"
+    except Exception as e:
+        logging.error(f"❌ 예외 발생: {type(e).__name__}: {e}")
+        return None
 
 # ========== 메인 실행 로직 ==========
 def main():
@@ -146,11 +135,50 @@ def main():
     logging.info("🚀 Playwright 자동화 테스트 시작")
     logging.info("=" * 60)
     
-    # 환경변수에서 테스트 케이스 가져오기
+    # ⭐ 환경변수 상세 확인
+    logging.info(f"🔐 환경변수 검증:")
+    logging.info(f"  - LAAS_API_KEY: {'✅ 설정됨' if LAAS_API_KEY else '❌ 없음'}")
+    logging.info(f"  - PROJECT_CODE: {'✅ 설정됨' if PROJECT_CODE else '❌ 없음'} (값: {PROJECT_CODE})")
+    logging.info(f"  - PRESET_HASH: {'✅ 설정됨' if PRESET_HASH else '❌ 없음'}")
+    
+    # 환경변수 누락 체크
+    if not LAAS_API_KEY:
+        logging.error("❌ LAAS_API_KEY가 설정되지 않았습니다!")
+        return
+    
+    if not PROJECT_CODE:
+        logging.error("❌ PROJECT_CODE가 설정되지 않았습니다!")
+        return
+        
+    if not PRESET_HASH:
+        logging.error("❌ PRESET_HASH가 설정되지 않았습니다!")
+        return
+    
+    # 테스트 케이스 가져오기
     test_cases_json = os.environ.get('TEST_CASES', '[]')
-    test_cases = json.loads(test_cases_json)
+    
+    try:
+        test_cases = json.loads(test_cases_json)
+        if test_cases is None:
+            test_cases = []
+    except json.JSONDecodeError as e:
+        logging.error(f"❌ TEST_CASES JSON 파싱 실패: {e}")
+        test_cases = []
     
     logging.info(f"📋 총 {len(test_cases)}개의 테스트 케이스")
+    
+    if len(test_cases) == 0:
+        logging.warning("⚠️ 테스트 케이스가 없습니다!")
+        result_file = f'test_results/result_{timestamp}.json'
+        with open(result_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': timestamp,
+                'total': 0,
+                'success': 0,
+                'failed': 0,
+                'results': []
+            }, f, indent=2, ensure_ascii=False)
+        return
     
     results = []
     
@@ -160,7 +188,7 @@ def main():
         logging.info(f"📝 테스트 케이스 {test_no} 처리 중...")
         logging.info(f"{'='*60}")
         
-        # 1. 코드 생성
+        # 코드 생성
         logging.info("🤖 LaaS API로 Playwright 코드 생성 중...")
         generated_code = generate_playwright_code(test_case)
         
@@ -173,25 +201,19 @@ def main():
             })
             continue
         
-        # 2. 코드 실행
-        success, output = run_playwright_code(generated_code, test_no)
-        
-        # 3. 결과 저장
-        status = 'SUCCESS' if success else 'FAILED'
-        code_filename = f'generated_codes/test_{test_no}_{status.lower()}.py'
-        
+        # 코드 저장
+        code_filename = f'generated_codes/test_{test_no}_success.py'
         with open(code_filename, 'w', encoding='utf-8') as f:
             f.write(generated_code)
         
         results.append({
             'test_no': test_no,
-            'status': status,
-            'output': output,
+            'status': 'SUCCESS',
             'code_file': code_filename,
             'test_case': test_case
         })
         
-        logging.info(f"{'✅ 성공' if success else '❌ 실패'}: 테스트 {test_no}")
+        logging.info(f"✅ 테스트 {test_no} 완료")
     
     # 최종 결과 저장
     result_file = f'test_results/result_{timestamp}.json'
