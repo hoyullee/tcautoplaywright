@@ -10,27 +10,28 @@ async def test_case():
         page = await context.new_page()
         
         try:
-            await page.goto('https://career.programmers.co.kr')
+            await page.goto('{base_url}')
             await page.wait_for_load_state('networkidle')
             
-            login_button = page.locator('a[href*="/user/login"]').first()
-            if not await login_button.is_visible():
-                login_button = page.locator('text=로그인').first()
-            if not await login_button.is_visible():
-                login_button = page.locator('[data-testid*="login"]').first()
-            if not await login_button.is_visible():
-                login_button = page.locator('.gnb').locator('a').filter(has_text='로그인').first()
+            login_button = page.locator('text=회원가입/로그인').or_(
+                page.locator('[href*="login"]')
+            ).or_(
+                page.locator('a:has-text("로그인")')
+            ).or_(
+                page.locator('button:has-text("로그인")')
+            ).first()
             
+            await login_button.wait_for(state='visible')
             await login_button.click()
             await page.wait_for_load_state('networkidle')
             
             current_url = page.url
-            if '/user/login' in current_url or 'login' in current_url:
+            if '/user/login' in current_url:
+                print("✅ 테스트 성공: 회원가입/로그인 페이지 정상 진입")
                 await page.screenshot(path='login_page_success.png')
-                print("✅ 테스트 성공: 로그인 페이지 진입 완료")
                 return True
             else:
-                raise Exception(f"로그인 페이지 진입 실패. 현재 URL: {current_url}")
+                raise Exception(f"페이지 이동 실패. 현재 URL: {current_url}")
             
         except Exception as e:
             print(f"❌ 테스트 실패: {str(e)}")
