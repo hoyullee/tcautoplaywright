@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true  # ✅ 이미 있음
+          persist-credentials: true
       
       - name: Python 3.11 설정
         uses: actions/setup-python@v4
@@ -28,6 +28,37 @@ jobs:
         run: |
           pip install playwright requests python-dotenv
           playwright install chromium
+      
+      # ⭐ 새로 추가: 환경변수 디버깅
+      - name: 환경변수 확인 (디버깅)
+        env:
+          LAAS_API_KEY: ${{ secrets.LAAS_API_KEY }}
+          PROJECT_CODE: ${{ secrets.PROJECT_CODE }}
+          PRESET_HASH: ${{ secrets.PRESET_HASH }}
+        run: |
+          echo "======================================"
+          echo "🔍 GitHub Secrets 전달 확인"
+          echo "======================================"
+          if [ -n "$LAAS_API_KEY" ]; then
+            echo "✅ LAAS_API_KEY: 설정됨 (길이: ${#LAAS_API_KEY}자)"
+            echo "   시작 10자: ${LAAS_API_KEY:0:10}..."
+          else
+            echo "❌ LAAS_API_KEY: 없음"
+          fi
+          
+          if [ -n "$PROJECT_CODE" ]; then
+            echo "✅ PROJECT_CODE: $PROJECT_CODE"
+          else
+            echo "❌ PROJECT_CODE: 없음"
+          fi
+          
+          if [ -n "$PRESET_HASH" ]; then
+            echo "✅ PRESET_HASH: 설정됨 (길이: ${#PRESET_HASH}자)"
+            echo "   시작 15자: ${PRESET_HASH:0:15}..."
+          else
+            echo "❌ PRESET_HASH: 없음"
+          fi
+          echo "======================================"
       
       - name: 테스트 실행
         env:
@@ -44,4 +75,4 @@ jobs:
           git config --global user.email "actions@github.com"
           git add generated_codes/ test_results/ screenshots/ logs/
           git commit -m "Test results from $(date +'%Y-%m-%d %H:%M:%S')" || echo "변경사항 없음"
-          git push origin master  # ✅ 브랜치명 master로 OK
+          git push origin master
