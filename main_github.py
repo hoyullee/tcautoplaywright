@@ -35,28 +35,43 @@ def generate_playwright_code(test_case):
     """테스트 케이스를 Playwright 코드로 변환"""
     
     prompt = f"""
-다음 테스트 케이스를 Playwright Python 코드로 변환해주세요:
+                다음 테스트 케이스를 Playwright Python 코드로 변환해주세요:
 
-환경: {test_case.get('환경', 'PC')}
-기능영역: {test_case.get('기능영역', '')}
-테스트 단계: {test_case.get('단계', '')}
-기대결과: {test_case.get('기대결과', '')}
+                **테스트 정보**
+                - NO: {test_case.get('NO', '')}
+                - 환경: {test_case.get('환경', 'PC')}
+                - 기능영역: {test_case.get('기능영역', '')}
 
-요구사항:
-1. async/await 사용
-2. headless=True로 설정
-3. 스크린샷 캡처 포함
-4. 명확한 에러 처리
-"""
+                **사전조건**
+                {test_case.get('사전조건', '없음')}
+
+                **확인사항**
+                {test_case.get('확인사항', '')}
+
+                **기대결과**
+                {test_case.get('기대결과', '')}
+
+                **비고**
+                {test_case.get('비고', '없음')}
+
+                **요구사항**
+                1. async/await 사용
+                2. headless=True로 설정
+                3. 스크린샷 캡처 포함
+                4. 명확한 에러 처리
+                5. 환경이 'Mobile'이면 모바일 에뮬레이션 사용
+
+                코드만 출력하고 추가 설명은 불필요합니다.
+                """
 
     headers = {
-        'apiKey': LAAS_API_KEY,           # Authorization → apiKey로 변경
-        'project': PROJECT_CODE,           # 프로젝트 코드 추가 필요
+        'apiKey': LAAS_API_KEY,
+        'project': PROJECT_CODE,
         'Content-Type': 'application/json; charset=utf-8'
     }
     
     payload = {
-        'hash': PRESET_HASH,  # 프리셋 해시 값 필요
+        'hash': PRESET_HASH,
         'messages': [
             {
                 'role': 'user',
@@ -70,7 +85,6 @@ def generate_playwright_code(test_case):
         response.raise_for_status()
         
         result = response.json()
-        # 응답 형식이 다를 수 있으므로 확인 필요
         code = result['choices'][0]['message']['content']
         
         # 코드 블록 추출
