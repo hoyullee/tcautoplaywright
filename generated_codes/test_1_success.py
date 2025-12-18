@@ -10,28 +10,28 @@ async def test_case():
         page = await context.new_page()
         
         try:
-            await page.goto('{base_url}')
+            # 사전조건: 채용 홈 진입 상태
+            await page.goto('https://www.wanted.co.kr/')
             await page.wait_for_load_state('networkidle')
             
-            login_button = page.locator('text=회원가입/로그인').or_(
-                page.locator('[href*="login"]')
-            ).or_(
-                page.locator('a:has-text("로그인")')
-            ).or_(
-                page.locator('button:has-text("로그인")')
-            ).first()
-            
+            # 1. 상단 GNB 영역 > 회원가입/로그인 버튼 선택
+            login_button = page.locator('a[href="/user/login"]').first
             await login_button.wait_for(state='visible')
             await login_button.click()
-            await page.wait_for_load_state('networkidle')
             
+            # 2. 회원가입/로그인 페이지 진입 확인
+            await page.wait_for_load_state('networkidle')
+            await page.wait_for_url('**/user/login')
+            
+            # 기대결과: 회원가입/로그인 페이지 정상 진입 검증
             current_url = page.url
-            if '/user/login' in current_url:
-                print("✅ 테스트 성공: 회원가입/로그인 페이지 정상 진입")
-                await page.screenshot(path='login_page_success.png')
-                return True
-            else:
-                raise Exception(f"페이지 이동 실패. 현재 URL: {current_url}")
+            assert '/user/login' in current_url, f"Expected login page, but got {current_url}"
+            
+            # 스크린샷 캡처
+            await page.screenshot(path='test_login_page_access.png')
+            
+            print("✅ 테스트 성공: 회원가입/로그인 페이지 정상 진입")
+            return True
             
         except Exception as e:
             print(f"❌ 테스트 실패: {str(e)}")
