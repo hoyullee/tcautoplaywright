@@ -8,7 +8,7 @@ async def test_case():
         context = await browser.new_context(
             viewport={'width': 1920, 'height': 1080}
         )
-        page = context.new_page()
+        page = await context.new_page()
         page.set_default_timeout(30000)
         
         try:
@@ -19,7 +19,7 @@ async def test_case():
             await page.goto('https://id.wanted.co.kr/login')
             await page.wait_for_load_state('networkidle')
             
-            # 페이지 진입 후 스크린샷
+            # 초기 페이지 스크린샷
             await page.screenshot(path='screenshots/test_2_initial.png')
             
             # 1. 이메일로 계속하기 버튼 선택
@@ -30,20 +30,15 @@ async def test_case():
             # 2. 페이지 진입 확인
             await page.wait_for_load_state('networkidle')
             
-            # 이메일 로그인 페이지 요소 확인
+            # 이메일 로그인 페이지 진입 확인
             email_input = page.locator('input[type="email"]')
             await email_input.wait_for(state='visible')
             
             # 최종 스크린샷
             await page.screenshot(path='screenshots/test_2_final.png')
             
-            # 기대결과 검증: 이메일 입력 필드가 있는지 확인
-            if await email_input.is_visible():
-                print("✅ 테스트 성공: 이메일로 로그인 페이지 진입 확인")
-                return True
-            else:
-                print("❌ 테스트 실패: 이메일 로그인 페이지가 표시되지 않음")
-                return False
+            print("✅ 테스트 성공: 이메일로 로그인 페이지 진입 확인")
+            return True
             
         except Exception as e:
             print(f"❌ 테스트 실패: {str(e)}")
