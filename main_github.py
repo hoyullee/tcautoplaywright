@@ -2,13 +2,14 @@ import os
 import json
 import logging
 import requests
+import time
 from datetime import datetime
 from pathlib import Path
 
 # ========== 설정 ==========
-LAAS_API_KEY = os.environ.get('LAAS_API_KEY')  # ⭐ 수정
-PROJECT_CODE = os.environ.get('PROJECT_CODE')  # ⭐ 수정
-PRESET_HASH = os.environ.get('PRESET_HASH')    # ⭐ 수정
+LAAS_API_KEY = os.environ.get('LAAS_API_KEY')
+PROJECT_CODE = os.environ.get('PROJECT_CODE')
+PRESET_HASH = os.environ.get('PRESET_HASH')
 LAAS_API_URL = 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions'
 
 # 디렉토리 생성
@@ -28,9 +29,9 @@ logging.basicConfig(
     ]
 )
 
-# ========== LaaS API 호출 ==========
-def generate_playwright_code(test_case):
-    """테스트 케이스를 Playwright 코드로 변환"""
+# ========== LaaS API 호출 (재시도 포함) ==========
+def generate_playwright_code(test_case, max_retries=3):
+    """테스트 케이스를 Playwright 코드로 변환 (재시도 포함)"""
     
     # 기능영역 기반 URL 결정
     function_area = test_case.get('기능영역', '')
@@ -87,36 +88,68 @@ await page.wait_for_load_state('networkidle')
         ]
     }
     
-    try:
-        response = requests.post(LAAS_API_URL, headers=headers, json=payload, timeout=60)
+    # ⭐ 재시도 로직
+    for attempt in range(1, max_retries + 1):
+        try:
+            logging.info(f"🔄 API 호출 시도 {attempt}/{max_retries}")
+            
+            response = requests.post(LAAS_API_URL, headers=headers, json=payload, timeout=60)
+            
+            if response.status_code == 401:
+                logging.error(f"❌ 인증 실패 (401) - 재시도 불가")
+                return None, "인증 실패"
+            
+            response.raise_for_status()
+            result = response.json()
+            code = result['choices'][0]['message']['content']
+            
+            # 코드 블록 추출
+            if '```python' in code:
+                code = code.split('```python')[1].split('```')[0].strip()
+            elif '```' in code:
+                code = code.split('```')[1].split('```')[0].strip()
+            
+            logging.info(f"✅ 코드 생성 성공 ({len(code)}자) - 시도 {attempt}회")
+            logging.info(f"   사용된 기본 URL: {base_url}")
+            
+            return code, None
         
-        if response.status_code == 401:
-            logging.error(f"❌ 인증 실패 (401)")
-            return None
-        
-        response.raise_for_status()
-        result = response.json()
-        code = result['choices'][0]['message']['content']
-        
-        # 코드 블록 추출
-        if '```python' in code:
-            code = code.split('```python')[1].split('```')[0].strip()
-        elif '```' in code:
-            code = code.split('```')[1].split('```')[0].strip()
-        
-        logging.info(f"✅ 코드 생성 성공 ({len(code)}자)")
-        logging.info(f"   사용된 기본 URL: {base_url}")
-        
-        return code
+        except requests.exceptions.Timeout:
+            error_msg = f"타임아웃 (60초 초과)"
+            logging.warning(f"⏱️ {error_msg} - 시도 {attempt}/{max_retries}")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt  # 지수 백오프: 2초, 4초, 8초
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                logging.error(f"❌ 최대 재시도 횟수 초과")
+                return None, error_msg
+                
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"HTTP 에러: {e}"
+            logging.warning(f"❌ {error_msg} - 시도 {attempt}/{max_retries}")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                logging.error(f"❌ 최대 재시도 횟수 초과")
+                if 'response' in locals():
+                    logging.error(f"  - 응답: {response.text[:500]}")
+                return None, error_msg
+                
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logging.warning(f"⚠️ {error_msg} - 시도 {attempt}/{max_retries}")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                logging.error(f"❌ 최대 재시도 횟수 초과")
+                return None, error_msg
     
-    except requests.exceptions.HTTPError as e:
-        logging.error(f"❌ HTTP 에러: {e}")
-        if 'response' in locals():
-            logging.error(f"  - 응답: {response.text}")
-        return None
-    except Exception as e:
-        logging.error(f"❌ 예외 발생: {type(e).__name__}: {e}")
-        return None
+    return None, "알 수 없는 오류"
 
 # ========== 메인 실행 로직 ==========
 def main():
@@ -176,30 +209,44 @@ def main():
         logging.info(f"{'='*60}")
         
         logging.info("🤖 LaaS API로 Playwright 코드 생성 중...")
-        generated_code = generate_playwright_code(test_case)
+        
+        # ⭐ 재시도 포함된 함수 호출
+        generated_code, error = generate_playwright_code(test_case, max_retries=3)
         
         if not generated_code:
+            logging.error(f"❌ 테스트 케이스 {test_no} 코드 생성 실패: {error}")
             results.append({
                 'test_no': test_no,
                 'status': 'FAILED',
-                'reason': '코드 생성 실패',
-                'test_case': test_case
+                'reason': f'코드 생성 실패: {error}',
+                'test_case': test_case,
+                'retries': 3  # 3회 재시도 후 실패
             })
             continue
         
         # 코드 저장
         code_filename = f'test/test_{test_no}_success.spec.py'
-        with open(code_filename, 'w', encoding='utf-8') as f:
-            f.write(generated_code)
-        
-        results.append({
-            'test_no': test_no,
-            'status': 'SUCCESS',
-            'code_file': code_filename,
-            'test_case': test_case
-        })
-        
-        logging.info(f"✅ 테스트 {test_no} 완료")
+        try:
+            with open(code_filename, 'w', encoding='utf-8') as f:
+                f.write(generated_code)
+            
+            results.append({
+                'test_no': test_no,
+                'status': 'SUCCESS',
+                'code_file': code_filename,
+                'test_case': test_case
+            })
+            
+            logging.info(f"✅ 테스트 {test_no} 완료 - 파일: {code_filename}")
+            
+        except Exception as e:
+            logging.error(f"❌ 파일 저장 실패: {e}")
+            results.append({
+                'test_no': test_no,
+                'status': 'FAILED',
+                'reason': f'파일 저장 실패: {str(e)}',
+                'test_case': test_case
+            })
     
     # 최종 결과 저장
     result_file = f'test_results/result_{timestamp}.json'
