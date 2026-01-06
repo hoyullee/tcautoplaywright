@@ -1,6 +1,5 @@
 from playwright.async_api import async_playwright
 import asyncio
-import os
 
 async def test_case():
     async with async_playwright() as p:
@@ -9,33 +8,33 @@ async def test_case():
             viewport={'width': 1920, 'height': 1080}
         )
         page = context.new_page()
-        page.set_default_timeout(30000)
         
         try:
-            # 스크린샷 디렉토리 생성
-            os.makedirs('screenshots', exist_ok=True)
-            
             # 채용 홈 진입 상태 (사전조건)
-            await page.goto('https://www.wanted.co.kr/')
+            await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('networkidle')
             await page.screenshot(path='screenshots/test_1_home.png')
             
-            # 1. 상단 GNB 영역 > 회원가입/로그인 버튼 선택
-            login_button = page.locator('a[href*="login"], button:has-text("로그인"), a:has-text("로그인")').first()
-            await login_button.wait_for(state='visible')
+            # 상단 GNB 영역 > 회원가입/로그인 버튼 선택
+            login_button = page.locator('a[href*="login"], button:has-text("로그인"), a:has-text("로그인")')
+            await login_button.wait_for(state='visible', timeout=30000)
             await login_button.click()
             
-            # 2. 회원가입/로그인 페이지 진입 확인
+            # 페이지 이동 대기
+            await page.wait_for_load_state('networkidle')
+            
+            # 필수 시작 코드
             await page.goto('https://id.wanted.co.kr/login')
             await page.wait_for_load_state('networkidle')
             
+            # 회원가입/로그인 페이지 진입 확인
+            await page.wait_for_selector('input[type="email"], input[name="email"]', timeout=30000)
+            await page.wait_for_selector('input[type="password"], input[name="password"]', timeout=30000)
+            
             # URL 확인
             current_url = page.url
-            assert 'id.wanted.co.kr/login' in current_url, f"Expected login page URL, got: {current_url}"
-            
-            # 로그인 페이지 요소 확인
-            await page.wait_for_selector('input[type="email"], input[name="email"], input[placeholder*="이메일"]', timeout=10000)
-            await page.wait_for_selector('input[type="password"], input[name="password"], input[placeholder*="비밀번호"]', timeout=10000)
+            if 'id.wanted.co.kr/login' not in current_url:
+                raise Exception(f"잘못된 페이지 접근: {current_url}")
             
             # 최종 스크린샷 캡처
             await page.screenshot(path='screenshots/test_1_login_page.png')
