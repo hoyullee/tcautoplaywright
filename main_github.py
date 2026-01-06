@@ -188,7 +188,7 @@ def main():
             continue
         
         # 코드 저장
-        code_filename = f'generated_codes/test_{test_no}_success.py'
+        code_filename = f'generated_codes/test_{test_no}_success.spec.py'
         with open(code_filename, 'w', encoding='utf-8') as f:
             f.write(generated_code)
         
