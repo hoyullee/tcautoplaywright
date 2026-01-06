@@ -12,7 +12,7 @@ PRESET_HASH = os.environ.get('PRESET_HASH')    # ⭐ 수정
 LAAS_API_URL = 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions'
 
 # 디렉토리 생성
-Path('generated_codes').mkdir(exist_ok=True)
+Path('test').mkdir(exist_ok=True)
 Path('test_results').mkdir(exist_ok=True)
 Path('screenshots').mkdir(exist_ok=True)
 Path('logs').mkdir(exist_ok=True)
@@ -188,7 +188,7 @@ def main():
             continue
         
         # 코드 저장
-        code_filename = f'generated_codes/test_{test_no}_success.spec.py'
+        code_filename = f'test/test_{test_no}_success.spec.py'
         with open(code_filename, 'w', encoding='utf-8') as f:
             f.write(generated_code)
         
