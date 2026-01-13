@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import requests
+import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -62,11 +64,39 @@ def generate_playwright_code(test_case, max_retries=3):
 3. headless=True
 4. 스크린샷 캡처 (screenshots/test_{test_case.get('NO', '')}_*.png)
 5. 에러 처리 및 타임아웃 30초
+6. 반드시 성공 시 return True, 실패 시 return False
 
 **시작 코드**:
 ```python
-await page.goto('{base_url}')
-await page.wait_for_load_state('networkidle')
+from playwright.async_api import async_playwright
+import asyncio
+
+async def test_case():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        try:
+            await page.goto('{base_url}')
+            await page.wait_for_load_state('networkidle')
+            
+            # 테스트 로직...
+            
+            await page.screenshot(path='screenshots/test_{test_case.get('NO', '')}_success.png')
+            print("✅ 테스트 성공")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 테스트 실패: {{e}}")
+            await page.screenshot(path='screenshots/test_{test_case.get('NO', '')}_error.png')
+            return False
+            
+        finally:
+            await browser.close()
+
+if __name__ == "__main__":
+    result = asyncio.run(test_case())
+    sys.exit(0 if result else 1)
 ```
 
 코드만 출력하세요.
@@ -88,7 +118,7 @@ await page.wait_for_load_state('networkidle')
         ]
     }
     
-    # ⭐ 재시도 로직
+    # 재시도 로직
     for attempt in range(1, max_retries + 1):
         try:
             logging.info(f"🔄 API 호출 시도 {attempt}/{max_retries}")
@@ -118,7 +148,7 @@ await page.wait_for_load_state('networkidle')
             error_msg = f"타임아웃 (60초 초과)"
             logging.warning(f"⏱️ {error_msg} - 시도 {attempt}/{max_retries}")
             if attempt < max_retries:
-                wait_time = 2 ** attempt  # 지수 백오프: 2초, 4초, 8초
+                wait_time = 2 ** attempt
                 logging.info(f"   {wait_time}초 후 재시도...")
                 time.sleep(wait_time)
             else:
@@ -150,6 +180,62 @@ await page.wait_for_load_state('networkidle')
                 return None, error_msg
     
     return None, "알 수 없는 오류"
+
+# ========== Playwright 코드 실행 ==========
+def run_playwright_code(code_file, test_no, max_retries=3):
+    """생성된 Playwright 코드를 실행 (최대 3회 재시도)"""
+    
+    for attempt in range(1, max_retries + 1):
+        logging.info(f"▶️ 테스트 {test_no} 실행 시도 {attempt}/{max_retries}")
+        
+        try:
+            # Python 파일 실행
+            result = subprocess.run(
+                [sys.executable, code_file],
+                capture_output=True,
+                text=True,
+                timeout=120,  # 2분 타임아웃
+                cwd=os.getcwd()
+            )
+            
+            # 성공 (exit code 0)
+            if result.returncode == 0:
+                logging.info(f"✅ 테스트 {test_no} 실행 성공!")
+                if result.stdout:
+                    logging.info(f"출력:\n{result.stdout}")
+                return True, result.stdout, None
+            
+            # 실패
+            error_msg = result.stderr or result.stdout
+            logging.warning(f"❌ 테스트 {test_no} 실행 실패 (시도 {attempt}/{max_retries})")
+            logging.warning(f"에러:\n{error_msg[:500]}")  # 처음 500자만
+            
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                return False, result.stdout, error_msg
+                
+        except subprocess.TimeoutExpired:
+            logging.warning(f"⏱️ 테스트 {test_no} 타임아웃 (시도 {attempt}/{max_retries})")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                return False, None, "타임아웃 (120초 초과)"
+                
+        except Exception as e:
+            logging.warning(f"⚠️ 테스트 {test_no} 예외 발생 (시도 {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logging.info(f"   {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                return False, None, str(e)
+    
+    return False, None, "최대 재시도 횟수 초과"
 
 # ========== 메인 실행 로직 ==========
 def main():
@@ -208,45 +294,73 @@ def main():
         logging.info(f"📝 테스트 케이스 {test_no} 처리 중...")
         logging.info(f"{'='*60}")
         
+        # 1. 코드 생성
         logging.info("🤖 LaaS API로 Playwright 코드 생성 중...")
-        
-        # ⭐ 재시도 포함된 함수 호출
-        generated_code, error = generate_playwright_code(test_case, max_retries=3)
+        generated_code, gen_error = generate_playwright_code(test_case, max_retries=3)
         
         if not generated_code:
-            logging.error(f"❌ 테스트 케이스 {test_no} 코드 생성 실패: {error}")
+            logging.error(f"❌ 테스트 케이스 {test_no} 코드 생성 실패: {gen_error}")
             results.append({
                 'test_no': test_no,
                 'status': 'FAILED',
-                'reason': f'코드 생성 실패: {error}',
+                'reason': f'코드 생성 실패: {gen_error}',
                 'test_case': test_case,
-                'retries': 3  # 3회 재시도 후 실패
+                'phase': 'generation',
+                'retries': 3
             })
             continue
         
-        # 코드 저장
-        code_filename = f'test/test_{test_no}_success.spec.py'
+        # 코드 저장 (임시)
+        code_filename = f'test/test_{test_no}_temp.spec.py'
         try:
             with open(code_filename, 'w', encoding='utf-8') as f:
                 f.write(generated_code)
-            
-            results.append({
-                'test_no': test_no,
-                'status': 'SUCCESS',
-                'code_file': code_filename,
-                'test_case': test_case
-            })
-            
-            logging.info(f"✅ 테스트 {test_no} 완료 - 파일: {code_filename}")
-            
         except Exception as e:
             logging.error(f"❌ 파일 저장 실패: {e}")
             results.append({
                 'test_no': test_no,
                 'status': 'FAILED',
                 'reason': f'파일 저장 실패: {str(e)}',
-                'test_case': test_case
+                'test_case': test_case,
+                'phase': 'save'
             })
+            continue
+        
+        # 2. 코드 실행
+        logging.info("▶️ 생성된 코드 실행 중...")
+        success, stdout, exec_error = run_playwright_code(code_filename, test_no, max_retries=3)
+        
+        # 3. 결과에 따라 파일명 변경
+        status = 'SUCCESS' if success else 'FAILED'
+        final_filename = f'test/test_{test_no}_{status.lower()}.spec.py'
+        
+        try:
+            if os.path.exists(final_filename):
+                os.remove(final_filename)
+            os.rename(code_filename, final_filename)
+        except Exception as e:
+            logging.warning(f"⚠️ 파일명 변경 실패: {e}")
+            final_filename = code_filename
+        
+        # 4. 결과 저장
+        result_data = {
+            'test_no': test_no,
+            'status': status,
+            'code_file': final_filename,
+            'test_case': test_case,
+            'phase': 'execution'
+        }
+        
+        if success:
+            result_data['output'] = stdout
+            logging.info(f"✅ 테스트 {test_no} 완료 - {final_filename}")
+        else:
+            result_data['error'] = exec_error
+            result_data['output'] = stdout
+            logging.error(f"❌ 테스트 {test_no} 실패 - {final_filename}")
+            logging.error(f"   에러: {exec_error[:200] if exec_error else 'None'}")
+        
+        results.append(result_data)
     
     # 최종 결과 저장
     result_file = f'test_results/result_{timestamp}.json'
