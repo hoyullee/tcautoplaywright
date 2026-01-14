@@ -74,6 +74,13 @@ import asyncio
 async def test_case():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
+
+        # 한국어 설정
+        context = await browser.new_context(
+            locale='ko-KR',           # 한국어
+            timezone_id='Asia/Seoul'  # 한국 시간대
+            )
+
         page = await browser.new_page()
         
         try:
