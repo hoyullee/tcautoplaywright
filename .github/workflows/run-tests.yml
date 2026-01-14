@@ -52,7 +52,7 @@ jobs:
       # 테스트 결과 업로드
       - name: 테스트 결과 업로드 (Artifacts)
         if: always()  # 성공/실패 여부와 관계없이 항상 실행
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ github.run_number }}
           path: |
