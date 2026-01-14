@@ -49,10 +49,16 @@ jobs:
           
           python main_github.py
       
-      - name: 결과 커밋 및 푸시
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-          git add test/
-          git commit -m "Test results from $(date +'%Y-%m-%d %H:%M:%S')" || echo "변경사항 없음"
-          git push origin master
+      # 테스트 결과 업로드
+      - name: 테스트 결과 업로드 (Artifacts)
+        if: always()  # 성공/실패 여부와 관계없이 항상 실행
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ github.run_number }}
+          path: |
+            test/
+            test_results/
+            screenshots/
+            logs/
+          retention-days: 30  # 30일 보관
+          if-no-files-found: warn  # 파일이 없으면 경고만
