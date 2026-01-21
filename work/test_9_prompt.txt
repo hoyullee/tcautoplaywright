@@ -2,14 +2,16 @@
 당신은 Playwright 테스트 자동화 전문가입니다.
 
 ## 테스트 정보
-- 테스트 번호: 4
+- 테스트 번호: 9
 - URL: https://www.wanted.co.kr/
 - 환경: PC
-- 기능영역: 채용 홈 > 회원가입/로그인
-- 사전조건: 1. 로그인 상태
-- 확인사항: 1. GNB 영역
-2. 프로필 아이콘 선택
-- 기대결과: 프로필 페이지 진입 확인
+- 기능영역: GNB > 교육•이벤트 > 회원가입/로그인
+- 사전조건: 1. 교육•이벤트 탭 진입 상태
+2. 회원가입/로그인 페이지 진입 상태
+- 확인사항: 1. 이메일로 계속하기 버튼 선택
+2. 이메일 및 비밀번호 입력
+2. 로그인 버튼 선택
+- 기대결과: 정상적으로 로그인되며 교육•이벤트 탭 페이지로 리다이렉트
 
 
 ## 🔐 테스트 계정 정보
@@ -25,7 +27,7 @@
 ## 작업 지시
 
 ### 1단계: 파일 생성
-test/test_4_working.py 파일을 생성하세요.
+test/test_9_working.py 파일을 생성하세요.
 
 ### 2단계: 코드 작성
 
@@ -67,8 +69,9 @@ async def main():
             # ========================================
             # 여기에 테스트 로직 작성
             # ========================================
-            # 확인사항: 1. GNB 영역
-2. 프로필 아이콘 선택
+            # 확인사항: 1. 이메일로 계속하기 버튼 선택
+2. 이메일 및 비밀번호 입력
+2. 로그인 버튼 선택
             #
             # ⚠️ 중요: 모든 Playwright 메서드에 await 사용!
             #
@@ -89,7 +92,7 @@ async def main():
             # await page.wait_for_load_state('networkidle')
             
             # 성공 스크린샷
-            await page.screenshot(path='screenshots/test_4_success.png')
+            await page.screenshot(path='screenshots/test_9_success.png')
             print("✅ 테스트 성공")
             print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
             return True
@@ -124,10 +127,10 @@ if __name__ == "__main__":
 - [ ] `asyncio.run(main())`로 실행
 
 ### 4단계: 코드 실행
-작성한 코드를 실행하세요: python test/test_4_working.py
+작성한 코드를 실행하세요: python test/test_9_working.py
 
 ### 5단계: 결과 처리
-- 성공하면 test/test_4_success.spec.py로 이름 변경
+- 성공하면 test/test_9_success.spec.py로 이름 변경
 - 실패하면 에러 분석 후 코드 수정하고 재시도
 
 ### 6단계: 최종 출력

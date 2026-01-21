@@ -97,7 +97,6 @@ async def main():
             
         except Exception as e:
             print(f"❌ 테스트 실패: {e}")
-            await page.screenshot(path='screenshots/test_5_error.png')
             print(f"AUTOMATION_FAILED: {e}")  # ⭐ 실패 시그널
             return False
             

@@ -1,36 +1,33 @@
 === 실행 시간 ===
-2026-01-21 13:21:59.297393
+2026-01-21 15:18:04.485028
 
 === 종료 코드 ===
 0
 
 === 출력 ===
-## ✅ 테스트 완료!
+## ✅ 테스트 완료
 
 **AUTOMATION_SUCCESS**
 
-### 테스트 결과 요약
-- **테스트 번호**: 1
-- **URL**: https://www.wanted.co.kr/
-- **테스트 내용**: 채용 홈 > 회원가입/로그인 버튼 클릭
-- **결과**: ✅ 성공
+테스트가 성공적으로 완료되었습니다!
 
-### 실행 내용
-1. ✅ Wanted 채용 홈페이지 접속
+### 실행 결과
+- **파일명**: test/test_1_success.spec.py
+- **테스트 내용**: 원티드 채용 홈에서 회원가입/로그인 버튼 클릭 및 페이지 이동 확인
+- **최종 URL**: https://id.wanted.co.kr/login?service=wanted&before_url=https%3A%2F%2Fwww.wanted.co.kr%2F&client_id=AhWBZolyUalsuJpHVRDrE4Px&message_key=userweb_home
+- **스크린샷**: screenshots/test_1_success.png 저장 완료
+
+### 테스트 단계
+1. ✅ 채용 홈(https://www.wanted.co.kr/) 접속
 2. ✅ 상단 GNB 영역 확인
-3. ✅ "회원가입/로그인" 버튼 발견 및 클릭
-4. ✅ 로그인 페이지로 정상 전환 확인
-   - 이동된 URL: `https://id.wanted.co.kr/login?service=wanted...`
-
-### 생성된 파일
-- `test/test_1_success.spec.py` - 성공한 테스트 코드
-- `screenshots/test_1_success.png` - 테스트 성공 스크린샷
-- `screenshots/test_1_before_click.png` - 버튼 클릭 전 스크린샷
+3. ✅ 회원가입/로그인 버튼 찾기 (role='button', name='회원가입/로그인')
+4. ✅ 버튼 클릭
+5. ✅ 로그인 페이지로 정상 이동 확인
 
 ### 참고사항
-- Chromium에서 크래시 이슈가 발생하여 **Firefox** 브라우저로 실행했습니다.
-- 모든 async/await 구문이 올바르게 작성되었습니다.
-- 테스트 계정 정보는 코드에 포함되어 있습니다 (필요 시 사용 가능).
+- Chromium 브라우저 크래시 이슈로 인해 Firefox 브라우저로 전환하여 실행
+- 모든 async/await 구문이 정확하게 적용됨
+- 로그인/회원가입 페이지로 정상 진입 확인
 
 
 === 에러 ===

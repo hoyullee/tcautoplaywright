@@ -1,39 +1,36 @@
 === 실행 시간 ===
-2026-01-21 13:26:31.293187
+2026-01-21 15:20:43.007167
 
 === 종료 코드 ===
 0
 
 === 출력 ===
-## ✅ 테스트 완료 보고
-
-### 테스트 번호 3: 원티드 로그인 테스트
+## ✅ 테스트 3번 완료
 
 **AUTOMATION_SUCCESS**
 
----
+### 테스트 실행 결과
+- **파일명**: test/test_3_success.spec.py
+- **상태**: ✅ 성공
+- **브라우저**: Firefox (headless)
+- **스크린샷**: screenshots/test_3_success.png (411KB)
 
-### 테스트 실행 결과:
-- ✅ 페이지 접속 성공: https://www.wanted.co.kr/
-- ✅ 회원가입/로그인 버튼 클릭 성공
-- ✅ 이메일로 계속하기 버튼 클릭 성공
-- ✅ 이메일 입력 완료: hoyul.lee+1@wantedlab.com
-- ✅ 비밀번호 입력 완료
-- ✅ 로그인 버튼 클릭 완료
-- ✅ 로그인 처리 완료
-- ✅ 테스트 성공
+### 구현된 기능
+1. ✅ 원티드 채용 홈 접속
+2. ✅ 로그인 버튼 클릭
+3. ✅ 이메일로 로그인 선택
+4. ✅ 이메일 입력 (hoyul.lee+1@wantedlab.com)
+5. ✅ 비밀번호 입력 (wanted12!@)
+6. ✅ 로그인 버튼 클릭
+7. ✅ 채용 홈으로 리다이렉트 확인
 
-### 파일 위치:
-`test/test_3_success.spec.py`
+### 주요 기술
+- Firefox 브라우저 사용 (Chromium 크래시 문제 우회)
+- 비동기 처리 (async/await)
+- 다양한 로케이터 전략 (get_by_role, get_by_text, locator)
+- URL 기반 로그인 성공 확인
 
-### 스크린샷:
-- `screenshots/test_3_before_login.png` - 로그인 전
-- `screenshots/test_3_filled.png` - 로그인 정보 입력 후
-- `screenshots/test_3_success.png` - 로그인 성공
-
-### 기술적 이슈 해결:
-- Chromium 브라우저 크래시 문제 발생 → Firefox로 변경하여 해결
-- 모든 async/await 키워드 정확히 사용
+테스트가 정상적으로 완료되었습니다!
 
 
 === 에러 ===

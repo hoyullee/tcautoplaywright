@@ -1,0 +1,39 @@
+=== 실행 시간 ===
+2026-01-21 15:34:03.537632
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+## 테스트 성공!
+
+**AUTOMATION_SUCCESS**
+
+테스트 8번이 성공적으로 완료되었습니다!
+
+### 테스트 결과 요약
+
+**테스트 번호**: 8
+**URL**: https://www.wanted.co.kr/
+**기능영역**: GNB > 교육•이벤트 > 회원가입/로그인
+
+### 실행 결과
+1. ✅ 메인 페이지 접속 완료
+2. ✅ 교육•이벤트 탭 클릭 성공 (링크 역할로 찾기)
+3. ✅ 회원가입/로그인 버튼 클릭 성공
+4. ✅ 로그인 페이지 진입 확인
+   - 최종 URL: `https://id.wanted.co.kr/login?service=wanted&before_url=https%3A%2F%2Fevent.wanted.co.kr%2F&client_id=AhWBZolyUalsuJpHVRDrE4Px&message_key=userweb_home`
+5. ✅ 스크린샷 저장: screenshots/test_8_success.png
+
+### 파일 생성
+- `test/test_8_success.spec.py` 생성 완료
+
+### 주요 구현 사항
+- Firefox 브라우저 사용 (Chromium 크래시 회피)
+- 비동기 Playwright API 완벽 구현
+- 다중 로케이터 전략 (get_by_role, get_by_text, locator)
+- URL 기반 로그인 페이지 진입 검증
+
+
+=== 에러 ===
+
