@@ -3,7 +3,7 @@ import os
 import sys
 
 # ========== 설정 ==========
-GOOGLE_DRIVE_FILE_ID = '1d3dpFEzBegqCBlIno1zJ8VEwsKP6J0rX'  # 나중에 설정
+GOOGLE_DRIVE_FILE_ID = '1pQqLsTuEgVk5EP-XTzY_e9xKzxi5sR-D'  # 나중에 설정
 OUTPUT_FILE = 'test_cases.json'
 
 def download_from_google_drive(file_id, output_path):
