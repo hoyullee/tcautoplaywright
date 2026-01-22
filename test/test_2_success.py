@@ -2,12 +2,14 @@ from playwright.async_api import async_playwright
 import asyncio
 import sys
 import os
+import pytest
 
 # ⭐ 테스트 계정 정보 (로그인 필요 시)
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
 
-async def main():
+@pytest.mark.asyncio
+async def test_main():
     async with async_playwright() as p:
         # 브라우저 실행 (Firefox 사용)
         browser = await p.firefox.launch(headless=True)
@@ -165,5 +167,5 @@ async def main():
             await browser.close()
 
 if __name__ == "__main__":
-    result = asyncio.run(main())
+    result = asyncio.run(test_main())
     sys.exit(0 if result else 1)

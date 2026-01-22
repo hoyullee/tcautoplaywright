@@ -85,12 +85,14 @@ from playwright.async_api import async_playwright
 import asyncio
 import sys
 import os
+import pytest
 
 # ⭐ 테스트 계정 정보 (로그인 필요 시)
 TEST_EMAIL = "{test_email}"
 TEST_PASSWORD = "{test_password}"
 
-async def main():
+@pytest.mark.asyncio
+async def test_main():
     async with async_playwright() as p:
         # 브라우저 실행
         browser = await p.chromium.launch(headless=True)
@@ -142,6 +144,8 @@ async def main():
             return True
             
         except Exception as e:
+            # 실패 스크린샷
+            await page.screenshot(path='screenshots/test_{test_no}_failed.png')
             print(f"❌ 테스트 실패: {{e}}")
             print(f"AUTOMATION_FAILED: {{e}}")  # ⭐ 실패 시그널
             return False
@@ -150,7 +154,7 @@ async def main():
             await browser.close()
 
 if __name__ == "__main__":
-    result = asyncio.run(main())
+    result = asyncio.run(test_main())
     sys.exit(0 if result else 1)
 ```
 
@@ -174,7 +178,7 @@ if __name__ == "__main__":
 작성한 코드를 실행하세요: python test/test_{test_no}_working.py
 
 ### 5단계: 결과 처리
-- 성공하면 test/test_{test_no}_success.spec.py로 이름 변경
+- 성공하면 test/test_{test_no}_success.py로 이름 변경
 - 실패하면 에러 분석 후 코드 수정하고 재시도
 
 ### 6단계: 최종 출력
@@ -235,7 +239,7 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                 logging.warning(f"⚠️ 종료 코드: {result.returncode}")
             
             # 성공 확인
-            success_file = f'test/test_{test_no}_success.spec.py'
+            success_file = f'test/test_{test_no}_success.py'
             working_file = f'test/test_{test_no}_working.py'  # ⭐ 추가
             screenshot = f'screenshots/test_{test_no}_success.png'
             
