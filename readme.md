@@ -2,36 +2,6 @@
 이 프로젝트는 **Google Sheets에 작성된 자연어 TestCase**를 자동으로 **Playwright 코드로 변환**하고, **실행, 재시도, 결과 저장**까지 수행하는 No-Code to Automated Testing 시스템입니다.
 Playwright를 기반으로 하며, **Mac OS** 환경에서 구현되었으며 **PC 브라우저**에서 실행됩니다.
 
-## 📋 목차
-- [시스템 구조](#시스템-구조)
-- [사전 요구사항](#사전-요구사항)
-- [설치 및 환경 구성](#설치-및-환경-구성)
-- [Google Sheets 설정](#google-sheets-설정)
-- [사용 방법](#사용-방법)
-- [실행 옵션](#실행-옵션)
-- [문제 해결](#문제-해결)
-- [프로젝트 구조](#프로젝트-구조)
-
----
-
-## 🏗️ 시스템 구조
-```
-Google Sheets (TC 작성)
-    ↓
-Google Apps Script (JSON 변환)
-    ↓
-Google Drive (test_cases.json 저장)
-    ↓
-Python Script (다운로드)
-    ↓
-Claude Code (Playwright 코드 생성)
-    ↓
-Playwright (테스트 실행)
-    ↓
-GitHub/로컬 (결과 저장)
-```
-
----
 
 ## 📦 사전 요구사항
 
@@ -350,17 +320,3 @@ screenshots/*.png
 export CLAUDE_CODE_OAUTH_TOKEN=<token>
 export GOOGLE_API_KEY=<api-key>
 ```
-
----
-
-## 📝 참고 자료
-- [Playwright 공식 문서](https://playwright.dev/python/)
-- [pytest 공식 문서](https://docs.pytest.org/)
-- [Claude Code 문서](https://docs.anthropic.com/en/docs/claude-code)
-- [Google Apps Script 가이드](https://developers.google.com/apps-script)
-
----
-
-
-## 👨‍💻 작성자
-이호율 with 절친 Claude
