@@ -71,9 +71,6 @@ addopts = -v --tb=short
 #### 6-1. Claude Code 설치
 ```bash
 # Mac (Homebrew)
-brew install anthropics/claude/claude
-
-# or brew 명령어가 안되는 경우
 npm install -g @anthropic-ai/claude-code
 
 # 또는 직접 다운로드
