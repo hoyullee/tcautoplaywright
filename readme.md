@@ -17,7 +17,7 @@ Playwright를 기반으로 하며, **Mac OS** 환경에서 구현되었으며 **
 ### 1. 저장소 클론 및 이동
 ```bash
 git clone <https://github.com/hoyullee/tcautoplaywright.git>
-cd sheets-automation
+cd tcautoplaywright
 ```
 
 ### 2. Python 가상환경 생성 및 활성화
@@ -72,6 +72,9 @@ addopts = -v --tb=short
 ```bash
 # Mac (Homebrew)
 brew install anthropics/claude/claude
+
+# or brew 명령어가 안되는 경우
+npm install -g @anthropic-ai/claude-code
 
 # 또는 직접 다운로드
 # https://docs.anthropic.com/en/docs/claude-code
