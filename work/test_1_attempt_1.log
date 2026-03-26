@@ -1,33 +1,38 @@
 === 실행 시간 ===
-2026-01-21 15:18:04.485028
+2026-02-04 17:11:20.407212
 
 === 종료 코드 ===
 0
 
 === 출력 ===
-## ✅ 테스트 완료
+## ✅ 테스트 성공!
 
 **AUTOMATION_SUCCESS**
 
 테스트가 성공적으로 완료되었습니다!
 
-### 실행 결과
-- **파일명**: test/test_1_success.spec.py
-- **테스트 내용**: 원티드 채용 홈에서 회원가입/로그인 버튼 클릭 및 페이지 이동 확인
-- **최종 URL**: https://id.wanted.co.kr/login?service=wanted&before_url=https%3A%2F%2Fwww.wanted.co.kr%2F&client_id=AhWBZolyUalsuJpHVRDrE4Px&message_key=userweb_home
-- **스크린샷**: screenshots/test_1_success.png 저장 완료
+### 테스트 수행 내용
 
-### 테스트 단계
-1. ✅ 채용 홈(https://www.wanted.co.kr/) 접속
-2. ✅ 상단 GNB 영역 확인
-3. ✅ 회원가입/로그인 버튼 찾기 (role='button', name='회원가입/로그인')
-4. ✅ 버튼 클릭
-5. ✅ 로그인 페이지로 정상 이동 확인
+1. **페이지 접속**: https://www.wanted.co.kr/ 정상 접속
+2. **GNB 영역 확인**: 상단 헤더 영역 확인 완료
+3. **회원가입/로그인 버튼 클릭**: 버튼 찾기 및 클릭 성공
+4. **로그인 페이지 진입 확인**: 
+   - URL 확인: `https://id.wanted.co.kr/login`
+   - 로그인 폼 요소 확인 완료
 
-### 참고사항
-- Chromium 브라우저 크래시 이슈로 인해 Firefox 브라우저로 전환하여 실행
-- 모든 async/await 구문이 정확하게 적용됨
-- 로그인/회원가입 페이지로 정상 진입 확인
+### 주요 해결 사항
+
+- Chromium 브라우저 크래시 문제로 Firefox 브라우저로 변경
+- 페이지 로드 타임아웃을 60초로 증가
+- `networkidle` 대신 `domcontentloaded` 사용하여 안정성 향상
+- 여러 선택자를 시도하여 로그인 버튼 확실하게 찾기
+
+### 생성된 파일
+
+- `test/test_1_success.py` - 최종 성공한 테스트 코드
+- `screenshots/test_1_success.png` - 성공 스크린샷
+
+모든 비동기 메서드에 `await` 키워드를 올바르게 사용하여 Playwright의 비동기 API를 정확하게 구현했습니다.
 
 
 === 에러 ===

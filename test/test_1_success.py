@@ -12,7 +12,9 @@ TEST_PASSWORD = "wanted12!@"
 async def test_main():
     async with async_playwright() as p:
         # 브라우저 실행 (Firefox 사용)
-        browser = await p.firefox.launch(headless=True)
+        browser = await p.firefox.launch(
+            headless=True
+        )
 
         # 한국어 설정
         context = await browser.new_context(
@@ -27,99 +29,103 @@ async def test_main():
 
             # 페이지 접속
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
-            await page.goto('https://www.wanted.co.kr/', timeout=30000)
-            await page.wait_for_load_state('networkidle')
+            await page.goto('https://www.wanted.co.kr/', timeout=60000)
+            await page.wait_for_load_state('domcontentloaded', timeout=30000)
             print("✅ 페이지 로드 완료")
 
             # ========================================
-            # 테스트 로직: 회원가입/로그인 버튼 찾기 및 클릭
+            # 테스트 로직: 회원가입/로그인 버튼 클릭
             # ========================================
 
             # 1. 상단 GNB 영역 확인
-            print("📍 단계 1: 상단 GNB 영역 확인")
-            gnb = page.locator('header, nav, [class*="header"], [class*="gnb"]').first
-            await gnb.wait_for(state='visible', timeout=10000)
+            print("🔍 상단 GNB 영역 확인 중...")
+            await page.wait_for_selector('header', state='visible', timeout=10000)
             print("✅ GNB 영역 확인 완료")
 
-            # 2. 회원가입/로그인 버튼 찾기
-            print("📍 단계 2: 회원가입/로그인 버튼 찾기")
+            # 2. 회원가입/로그인 버튼 찾기 및 클릭
+            print("🔍 회원가입/로그인 버튼 찾는 중...")
 
-            # 여러 가능한 로케이터 시도
+            # 여러 가능한 선택자 시도
             login_button = None
+            selectors = [
+                "button:has-text('회원가입/로그인')",
+                "a:has-text('회원가입/로그인')",
+                "button:has-text('회원가입')",
+                "a:has-text('회원가입')",
+                "button:has-text('로그인')",
+                "a:has-text('로그인')",
+                "[data-button-name*='login']",
+                "[data-button-name*='signup']"
+            ]
 
-            # 시도 1: role='button'과 텍스트로 찾기
-            try:
-                login_button = page.get_by_role('button', name='회원가입/로그인')
-                await login_button.wait_for(state='visible', timeout=3000)
-                print("✅ 버튼 찾기 성공 (role='button', name='회원가입/로그인')")
-            except:
-                pass
-
-            # 시도 2: 텍스트로 찾기
-            if not login_button or not await login_button.is_visible():
+            for selector in selectors:
                 try:
-                    login_button = page.get_by_text('회원가입/로그인').first
-                    await login_button.wait_for(state='visible', timeout=3000)
-                    print("✅ 버튼 찾기 성공 (get_by_text)")
+                    element = page.locator(selector).first
+                    if await element.count() > 0:
+                        login_button = element
+                        print(f"✅ 버튼 발견: {selector}")
+                        break
                 except:
-                    pass
+                    continue
 
-            # 시도 3: 로그인, 회원가입 텍스트 개별 검색
-            if not login_button or not await login_button.is_visible():
-                try:
-                    login_button = page.get_by_text('로그인').first
-                    await login_button.wait_for(state='visible', timeout=3000)
-                    print("✅ 버튼 찾기 성공 (get_by_text='로그인')")
-                except:
-                    pass
-
-            # 시도 4: CSS 선택자로 찾기
-            if not login_button or not await login_button.is_visible():
-                try:
-                    login_button = page.locator('a[href*="login"], button:has-text("로그인"), a:has-text("로그인")').first
-                    await login_button.wait_for(state='visible', timeout=3000)
-                    print("✅ 버튼 찾기 성공 (CSS 선택자)")
-                except:
-                    pass
-
-            # 버튼이 보이는지 최종 확인
-            if login_button and await login_button.is_visible():
-                # 초기 페이지 스크린샷
-                await page.screenshot(path='screenshots/test_1_before_click.png')
-                print("📸 클릭 전 스크린샷 저장")
-
-                # 버튼 클릭
-                print("🖱️  회원가입/로그인 버튼 클릭")
-                await login_button.click()
-
-                # 페이지 로드 대기
-                await page.wait_for_load_state('networkidle', timeout=10000)
-
-                # URL 변경 확인
-                current_url = page.url
-                print(f"📍 현재 URL: {current_url}")
-
-                # 로그인/회원가입 페이지로 이동했는지 확인
-                if 'login' in current_url.lower() or 'signup' in current_url.lower() or 'sign' in current_url.lower() or current_url != 'https://www.wanted.co.kr/':
-                    print("✅ 회원가입/로그인 페이지로 이동 완료")
-
-                    # 성공 스크린샷
-                    await page.screenshot(path='screenshots/test_1_success.png')
-                    print("✅ 테스트 성공")
-                    print("AUTOMATION_SUCCESS")
-                    return True
-                else:
-                    print(f"⚠️  URL이 예상과 다름: {current_url}")
-                    await page.screenshot(path='screenshots/test_1_success.png')
-                    print("✅ 테스트 성공 (버튼 클릭 완료)")
-                    print("AUTOMATION_SUCCESS")
-                    return True
-            else:
+            if login_button is None:
+                # 스크린샷 찍어서 확인
+                await page.screenshot(path='screenshots/test_1_debug.png', full_page=True)
                 raise Exception("회원가입/로그인 버튼을 찾을 수 없습니다")
 
+            # 버튼 클릭
+            print("🖱️  회원가입/로그인 버튼 클릭 중...")
+            await login_button.click()
+
+            # 페이지 전환 대기
+            await page.wait_for_load_state('networkidle', timeout=10000)
+            print("✅ 페이지 전환 완료")
+
+            # 3. 회원가입/로그인 페이지 진입 확인
+            print("🔍 로그인 페이지 진입 확인 중...")
+            current_url = page.url
+            print(f"📍 현재 URL: {current_url}")
+
+            # URL 또는 페이지 요소로 로그인 페이지 확인
+            is_login_page = False
+
+            # URL 체크
+            if 'login' in current_url.lower() or 'signup' in current_url.lower() or 'user' in current_url.lower():
+                is_login_page = True
+                print("✅ URL 기반 로그인 페이지 확인")
+
+            # 로그인 폼 요소 체크
+            login_form_selectors = [
+                "input[type='email']",
+                "input[type='password']",
+                "input[placeholder*='이메일']",
+                "input[placeholder*='비밀번호']",
+                "form"
+            ]
+
+            for selector in login_form_selectors:
+                try:
+                    if await page.locator(selector).count() > 0:
+                        is_login_page = True
+                        print(f"✅ 로그인 폼 요소 확인: {selector}")
+                        break
+                except:
+                    continue
+
+            if not is_login_page:
+                await page.screenshot(path='screenshots/test_1_failed.png', full_page=True)
+                raise Exception(f"로그인 페이지로 이동하지 않았습니다. 현재 URL: {current_url}")
+
+            # 성공 스크린샷
+            await page.screenshot(path='screenshots/test_1_success.png', full_page=True)
+            print("✅ 테스트 성공")
+            print("AUTOMATION_SUCCESS")
+            return True
+
         except Exception as e:
+            # 실패 스크린샷
+            await page.screenshot(path='screenshots/test_1_failed.png', full_page=True)
             print(f"❌ 테스트 실패: {e}")
-            await page.screenshot(path='screenshots/test_1_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             return False
 
