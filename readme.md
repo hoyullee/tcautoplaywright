@@ -221,7 +221,20 @@ pytest test/ -v -k "success"
 python test/test_1_success.py
 ```
 
-### 옵션 3: 단계별 수동 실행
+### 옵션 3: 특정 테스트 케이스만 재실행
+
+코드 생성에 실패한 특정 케이스만 단독으로 다시 실행할 수 있습니다.
+
+```bash
+# NO:4 케이스만 재실행
+python claude_automation.py --test-no 4
+```
+
+- 전체 케이스를 처음부터 다시 실행하지 않아도 됩니다.
+- `test_cases.json`에서 해당 `NO` 값을 가진 케이스만 찾아 실행합니다.
+- 성공 시 `test/test_4_success.py`로 저장됩니다.
+
+### 옵션 4: 단계별 수동 실행
 ```bash
 # 1. TC 다운로드만
 python download_tc.py

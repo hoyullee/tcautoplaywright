@@ -23,50 +23,57 @@ async def test_main():
 
             # 페이지 접속
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
-            await page.goto('https://www.wanted.co.kr/', timeout=30000)
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(2000)
+            await page.goto('https://www.wanted.co.kr/', timeout=60000)
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(3000)
             print("✅ 페이지 로드 완료")
 
             # 로그인 시작 - "회원가입/로그인" 버튼 클릭
             print("🔐 로그인 시작...")
             await page.get_by_role('button', name='회원가입/로그인').click()
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state('domcontentloaded')
             await page.wait_for_timeout(2000)
 
             # id.wanted.co.kr 로그인 페이지 - "이메일로 계속하기" 클릭
-            await page.get_by_role('button', name='이메일로 계속하기').click()
-            await page.wait_for_timeout(2000)
+            email_continue = page.get_by_role('button', name='이메일로 계속하기')
+            if await email_continue.count() > 0:
+                await email_continue.click()
+                await page.wait_for_timeout(2000)
 
             # 이메일/비밀번호 입력
             await page.locator('input[type="email"]').wait_for(state='visible', timeout=10000)
             await page.locator('input[type="email"]').fill(TEST_EMAIL)
             await page.locator('input[type="password"]').fill(TEST_PASSWORD)
             await page.get_by_role('button', name='로그인').click()
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state('domcontentloaded')
             await page.wait_for_timeout(3000)
-            print("✅ 로그인 완료")
-
-            # www.wanted.co.kr로 돌아왔는지 확인
-            current_url = page.url
-            print(f"📍 로그인 후 URL: {current_url}")
+            print(f"✅ 로그인 완료, 현재 URL: {page.url}")
 
             # GNB 영역 확인
             print("🔍 GNB 영역 확인...")
-            # GNB는 페이지 상단 네비게이션 바
-            # 로그인 후 GNB에서 프로필 아이콘이 보여야 함
-            await page.wait_for_timeout(1000)
+            gnb = page.locator('header').first
+            await gnb.wait_for(state='visible', timeout=10000)
+            assert await gnb.is_visible(), "GNB 영역이 보이지 않습니다"
+            print("✅ GNB 영역 확인 완료")
 
-            # GNB 내 모든 링크/버튼/이미지 탐색
-            print("🔍 GNB 요소 탐색...")
+            # 로그인 후 상태 스크린샷
+            await page.screenshot(path='screenshots/test_4_after_login.png')
+
+            # header 내 모든 링크 디버깅
             all_links = await page.locator('header a').all()
-            for lnk in all_links[:30]:
+            print(f"🔍 Header 링크 수: {len(all_links)}")
+            for lnk in all_links[:20]:
                 href = await lnk.get_attribute('href')
                 txt = await lnk.text_content()
-                print(f"  link: href={href}, text={txt.strip()[:30] if txt else ''}")
+                print(f"  link: href={href}, text={txt.strip()[:40] if txt else ''}")
 
-            # 스크린샷으로 현재 상태 확인
-            await page.screenshot(path='screenshots/test_4_after_login.png')
+            # header 내 모든 버튼 디버깅
+            all_btns = await page.locator('header button').all()
+            print(f"🔍 Header 버튼 수: {len(all_btns)}")
+            for btn in all_btns[:10]:
+                txt = await btn.text_content()
+                cls = await btn.get_attribute('class')
+                print(f"  button: class={cls}, text={txt.strip()[:40] if txt else ''}")
 
             # 프로필 아이콘 클릭
             print("🔍 프로필 아이콘 선택...")
@@ -82,10 +89,13 @@ async def test_main():
             ]:
                 elem = page.locator(selector).first
                 if await elem.count() > 0:
-                    await elem.click()
-                    profile_clicked = True
-                    print(f"✅ 클릭: {selector}")
-                    break
+                    try:
+                        await elem.click(timeout=5000)
+                        profile_clicked = True
+                        print(f"✅ 클릭: {selector}")
+                        break
+                    except Exception as ce:
+                        print(f"  클릭 실패 ({selector}): {ce}")
 
             if not profile_clicked:
                 # 2. 프로필 이미지(원형 아바타) 버튼
@@ -99,15 +109,19 @@ async def test_main():
                 ]:
                     elem = page.locator(selector).first
                     if await elem.count() > 0:
-                        await elem.click()
-                        profile_clicked = True
-                        print(f"✅ 클릭: {selector}")
-                        break
+                        try:
+                            await elem.click(timeout=5000)
+                            profile_clicked = True
+                            print(f"✅ 클릭: {selector}")
+                            break
+                        except Exception as ce:
+                            print(f"  클릭 실패 ({selector}): {ce}")
 
             if not profile_clicked:
                 raise Exception("프로필 아이콘을 찾을 수 없습니다")
 
             await page.wait_for_timeout(2000)
+            await page.screenshot(path='screenshots/test_4_after_profile_click.png')
 
             # 프로필 페이지 진입 확인
             current_url = page.url
@@ -117,11 +131,14 @@ async def test_main():
             for link_name in ['프로필', 'My Profile', '내 프로필']:
                 profile_menu_link = page.get_by_role('link', name=link_name)
                 if await profile_menu_link.count() > 0:
-                    await profile_menu_link.first.click()
-                    await page.wait_for_timeout(2000)
-                    current_url = page.url
-                    print(f"📍 드롭다운 '{link_name}' 클릭 후 URL: {current_url}")
-                    break
+                    try:
+                        await profile_menu_link.first.click(timeout=5000)
+                        await page.wait_for_timeout(2000)
+                        current_url = page.url
+                        print(f"📍 드롭다운 '{link_name}' 클릭 후 URL: {current_url}")
+                        break
+                    except Exception as ce:
+                        print(f"  드롭다운 클릭 실패: {ce}")
 
             # 최종 URL에서 프로필 페이지 확인
             assert '/profile' in current_url or '/users' in current_url or '/my' in current_url, \

@@ -3,6 +3,7 @@ import subprocess
 import os
 import time
 import logging
+import argparse
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -288,21 +289,33 @@ def run_claude_code(prompt, test_no, max_attempts=3):
 
 def main():
     """메인 함수"""
-    
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test-no', type=int, default=None, help='실행할 테스트 케이스 번호 (예: --test-no 4)')
+    args = parser.parse_args()
+
     print("\n" + "=" * 60)
     print("🚀 Claude Code Playwright 자동화")
     print("=" * 60 + "\n")
-    
+
     # test_cases.json 확인
     if not os.path.exists('test_cases.json'):
         logging.error("❌ test_cases.json 파일이 없습니다!")
         return
-    
+
     # 테스트 케이스 로드
     with open('test_cases.json', 'r', encoding='utf-8') as f:
         test_cases = json.load(f)
-    
-    logging.info(f"📋 총 {len(test_cases)}개 테스트")
+
+    # 특정 케이스만 필터링
+    if args.test_no is not None:
+        test_cases = [tc for tc in test_cases if tc.get('NO') == args.test_no]
+        if not test_cases:
+            logging.error(f"❌ NO:{args.test_no} 테스트 케이스를 찾을 수 없습니다!")
+            return
+        logging.info(f"🎯 NO:{args.test_no} 단일 테스트 실행")
+    else:
+        logging.info(f"📋 총 {len(test_cases)}개 테스트")
     
     results = []
     

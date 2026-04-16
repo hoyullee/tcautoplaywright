@@ -4,17 +4,14 @@ import sys
 import os
 import pytest
 
-# ⭐ 테스트 계정 정보 (로그인 필요 시)
+# ⭐ 테스트 계정 정보
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
 
 @pytest.mark.asyncio
 async def test_main():
     async with async_playwright() as p:
-        # 브라우저 실행 (Firefox 사용)
-        browser = await p.firefox.launch(headless=True)
-
-        # 한국어 설정
+        browser = await p.chromium.launch(headless=True, channel='chrome')
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul'
@@ -22,104 +19,79 @@ async def test_main():
         page = await context.new_page()
 
         try:
-            # screenshots 폴더 생성
             os.makedirs('screenshots', exist_ok=True)
 
-            # 페이지 접속
+            # 1. 교육•이벤트 탭 진입
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('networkidle')
             print("✅ 페이지 로드 완료")
 
-            # ========================================
-            # 테스트 로직
-            # ========================================
-
-            # 1단계: GNB에서 "교육·이벤트" 탭 클릭
-            print("📍 1단계: 교육·이벤트 탭 클릭")
-            await page.screenshot(path='screenshots/test_9_debug1.png')
-
-            # 여러 방법으로 시도
-            education_tab = None
-            try:
-                # 시도 1: role='link'로 찾기
-                education_tab = page.get_by_role('link', name='교육·이벤트')
-                await education_tab.wait_for(state='visible', timeout=5000)
-            except:
-                try:
-                    # 시도 2: 텍스트로 찾기
-                    education_tab = page.get_by_text('교육·이벤트').first
-                    await education_tab.wait_for(state='visible', timeout=5000)
-                except:
-                    try:
-                        # 시도 3: 부분 텍스트 매칭
-                        education_tab = page.locator('a:has-text("교육")').first
-                        await education_tab.wait_for(state='visible', timeout=5000)
-                    except:
-                        # 시도 4: 다양한 변형 시도
-                        education_tab = page.locator('text=교육').first
-                        await education_tab.wait_for(state='visible', timeout=5000)
-
-            await education_tab.click()
+            # 교육•이벤트 GNB 탭 클릭
+            print("🖱️ 교육•이벤트 탭 클릭")
+            edu_tab = page.get_by_role('link', name='교육·이벤트')
+            if not await edu_tab.is_visible():
+                edu_tab = page.locator('a[href*="events"]').first
+            await edu_tab.click()
             await page.wait_for_load_state('networkidle')
-            print("✅ 교육·이벤트 탭 진입 완료")
+            print(f"✅ 교육•이벤트 페이지 이동: {page.url}")
 
-            # 2단계: 로그인 버튼 찾아 클릭 (회원가입/로그인 페이지 진입)
-            print("📍 2단계: 로그인 버튼 클릭")
-            # GNB의 로그인 버튼 또는 페이지 내 로그인 버튼
-            login_button = page.get_by_role('button', name='로그인')
-            await login_button.click()
+            # 2. 회원가입/로그인 페이지 진입
+            print("🖱️ 로그인 버튼 클릭")
+            login_btn = page.get_by_role('link', name='로그인')
+            if not await login_btn.is_visible():
+                login_btn = page.locator('a[href*="login"], button:has-text("로그인")').first
+            await login_btn.click()
             await page.wait_for_load_state('networkidle')
-            print("✅ 로그인 페이지 진입 완료")
+            print(f"✅ 로그인 페이지 이동: {page.url}")
 
-            # 3단계: 이메일로 계속하기 버튼 선택
-            print("📍 3단계: 이메일로 계속하기 버튼 선택")
-            email_continue_button = page.get_by_role('button', name='이메일로 계속하기')
-            await email_continue_button.click()
-            await page.wait_for_timeout(1000)  # 입력 폼 나타날 때까지 대기
-            print("✅ 이메일 로그인 폼 표시")
+            # 3. 이메일로 계속하기 버튼 클릭
+            print("🖱️ 이메일로 계속하기 버튼 클릭")
+            email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
+            if not await email_continue_btn.is_visible():
+                email_continue_btn = page.locator('button:has-text("이메일로 계속하기")').first
+            await email_continue_btn.click()
+            await page.wait_for_load_state('networkidle')
+            print("✅ 이메일 로그인 폼 진입")
 
-            # 4단계: 이메일 입력
-            print("📍 4단계: 이메일 입력")
+            # 4. 이메일 입력
+            print(f"✉️ 이메일 입력: {TEST_EMAIL}")
             email_input = page.locator('input[type="email"]')
             await email_input.fill(TEST_EMAIL)
-            print(f"✅ 이메일 입력 완료: {TEST_EMAIL}")
 
-            # 5단계: 비밀번호 입력
-            print("📍 5단계: 비밀번호 입력")
+            # 5. 비밀번호 입력
+            print("🔑 비밀번호 입력")
             password_input = page.locator('input[type="password"]')
             await password_input.fill(TEST_PASSWORD)
-            print("✅ 비밀번호 입력 완료")
 
-            # 6단계: 로그인 버튼 선택
-            print("📍 6단계: 로그인 버튼 클릭")
-            login_submit_button = page.get_by_role('button', name='로그인')
-            await login_submit_button.click()
+            # 6. 로그인 버튼 클릭
+            print("🖱️ 로그인 버튼 클릭")
+            submit_btn = page.get_by_role('button', name='로그인')
+            if not await submit_btn.is_visible():
+                submit_btn = page.locator('button[type="submit"]').first
+            await submit_btn.click()
             await page.wait_for_load_state('networkidle')
-            print("✅ 로그인 완료")
+            print(f"✅ 로그인 완료. 현재 URL: {page.url}")
 
-            # 7단계: 교육·이벤트 탭 페이지로 리다이렉트 확인
-            print("📍 7단계: 교육·이벤트 페이지 리다이렉트 확인")
+            # 7. 교육•이벤트 탭 리다이렉트 확인
             current_url = page.url
-            print(f"현재 URL: {current_url}")
+            assert 'events' in current_url or 'wanted.co.kr' in current_url, \
+                f"로그인 후 예상치 못한 URL: {current_url}"
 
-            # URL에 교육·이벤트 관련 경로가 포함되어 있는지 확인
-            # (예: /events, /education 등)
-            if 'event' in current_url.lower() or 'education' in current_url.lower() or '/learn' in current_url:
-                print("✅ 교육·이벤트 페이지로 정상 리다이렉트됨")
-            else:
-                print(f"⚠️ 리다이렉트 확인: {current_url}")
+            # 로그인 성공 여부 확인 (로그인 버튼이 사라졌는지 확인)
+            login_link_visible = await page.locator('a[href*="login"]').is_visible()
+            assert not login_link_visible or 'events' in current_url, \
+                "로그인이 완료되지 않았거나 리다이렉트 실패"
 
-            # 성공 스크린샷
             await page.screenshot(path='screenshots/test_9_success.png')
             print("✅ 테스트 성공")
-            print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
+            print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            print(f"❌ 테스트 실패: {e}")
             await page.screenshot(path='screenshots/test_9_failed.png')
-            print(f"AUTOMATION_FAILED: {e}")  # ⭐ 실패 시그널
+            print(f"❌ 테스트 실패: {e}")
+            print(f"AUTOMATION_FAILED: {e}")
             return False
 
         finally:

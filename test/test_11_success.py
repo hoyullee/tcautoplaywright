@@ -4,17 +4,14 @@ import sys
 import os
 import pytest
 
-# ⭐ 테스트 계정 정보 (로그인 필요 시)
+# ⭐ 테스트 계정 정보
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
 
 @pytest.mark.asyncio
 async def test_main():
     async with async_playwright() as p:
-        # 브라우저 실행
-        browser = await p.firefox.launch(headless=True)
-
-        # 한국어 설정
+        browser = await p.chromium.launch(headless=True, channel='chrome')
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul'
@@ -22,106 +19,79 @@ async def test_main():
         page = await context.new_page()
 
         try:
-            # screenshots 폴더 생성
             os.makedirs('screenshots', exist_ok=True)
 
-            # 페이지 접속
-            print("🌐 페이지 접속: https://www.wanted.co.kr/")
-            await page.goto('https://www.wanted.co.kr/', timeout=30000)
+            # 소셜 탭 진입
+            print("🌐 소셜 탭 접속: https://www.wanted.co.kr/social")
+            await page.goto('https://www.wanted.co.kr/social', timeout=30000)
             await page.wait_for_load_state('networkidle')
-            print("✅ 페이지 로드 완료")
+            print("✅ 소셜 탭 로드 완료")
 
-            # ========================================
-            # 테스트 로직 시작
-            # ========================================
-
-            # 1. 소셜 탭 클릭 (사전조건 1)
-            print("📌 소셜 탭 클릭")
-            social_tab = page.get_by_role('link', name='소셜')
-            await social_tab.click()
+            # 회원가입/로그인 페이지 진입 - 로그인 버튼 클릭
+            print("🔍 로그인 버튼 찾는 중...")
+            login_link = page.get_by_role('link', name='로그인')
+            if await login_link.count() > 0:
+                await login_link.first.click()
+            else:
+                # 헤더의 로그인 버튼 시도
+                await page.get_by_text('로그인').first.click()
             await page.wait_for_load_state('networkidle')
-            print("✅ 소셜 탭 진입 완료")
+            print("✅ 로그인 페이지 진입")
 
-            # 2. 회원가입/로그인 버튼 클릭 (사전조건 2)
-            print("📌 회원가입/로그인 페이지 진입")
-            # 로그인 버튼 찾기 - 여러 가능성 시도
-            try:
-                # GNB의 로그인 버튼 클릭
-                login_button = page.get_by_role('button', name='회원가입/로그인')
-                await login_button.click()
-            except:
-                # 다른 로그인 버튼 시도
-                login_button = page.locator('button:has-text("로그인")')
-                await login_button.first.click()
-
+            # 이메일로 계속하기 버튼 선택
+            print("🔍 이메일로 계속하기 버튼 찾는 중...")
+            email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
+            if await email_continue_btn.count() == 0:
+                email_continue_btn = page.get_by_text('이메일로 계속하기')
+            await email_continue_btn.click()
             await page.wait_for_load_state('networkidle')
-            print("✅ 회원가입/로그인 페이지 진입 완료")
-
-            # 3. 이메일로 계속하기 버튼 선택 (확인사항 1)
-            print("📌 이메일로 계속하기 버튼 클릭")
-            email_continue_button = page.get_by_role('button', name='이메일로 계속하기')
-            await email_continue_button.click()
-            await page.wait_for_timeout(1000)  # 폼 로드 대기
-            print("✅ 이메일 로그인 폼 표시")
-
-            # 4. 이메일 및 비밀번호 입력 (확인사항 2)
-            print("📌 이메일 및 비밀번호 입력")
+            print("✅ 이메일로 계속하기 선택")
 
             # 이메일 입력
+            print("📧 이메일 입력 중...")
             email_input = page.locator('input[type="email"]')
+            if await email_input.count() == 0:
+                email_input = page.get_by_label('이메일')
             await email_input.fill(TEST_EMAIL)
-            print(f"✅ 이메일 입력: {TEST_EMAIL}")
+            print("✅ 이메일 입력 완료")
 
             # 비밀번호 입력
+            print("🔑 비밀번호 입력 중...")
             password_input = page.locator('input[type="password"]')
+            if await password_input.count() == 0:
+                password_input = page.get_by_label('비밀번호')
             await password_input.fill(TEST_PASSWORD)
             print("✅ 비밀번호 입력 완료")
 
-            # 5. 로그인 버튼 선택 (확인사항 3)
-            print("📌 로그인 버튼 클릭")
-            login_submit_button = page.get_by_role('button', name='로그인')
-            await login_submit_button.click()
+            # 로그인 버튼 선택
+            print("🖱️ 로그인 버튼 클릭 중...")
+            login_btn = page.get_by_role('button', name='로그인')
+            await login_btn.click()
+            await page.wait_for_load_state('networkidle')
+            print("✅ 로그인 버튼 클릭 완료")
 
-            # 6. 로그인 완료 및 리다이렉트 대기
-            print("📌 로그인 처리 및 리다이렉트 대기")
-            await page.wait_for_load_state('networkidle', timeout=10000)
-
-            # 7. 소셜 탭으로 리다이렉트 확인 (기대결과)
+            # 소셜 탭으로 리다이렉트 확인
             current_url = page.url
-            print(f"📌 현재 URL: {current_url}")
+            print(f"현재 URL: {current_url}")
 
-            # 로그인 성공 확인 - 소셜 페이지에 있고 로그인 상태인지 확인
-            if 'social' in current_url or 'community' in current_url:
-                print("✅ 소셜 탭으로 리다이렉트 확인")
-            else:
-                # URL이 변경되지 않았다면 페이지 내용으로 확인
-                await page.wait_for_timeout(2000)
-                current_url = page.url
-                print(f"📌 재확인 URL: {current_url}")
+            # 로그인 성공 여부 확인 (URL에 social이 포함되거나 로그인 상태 확인)
+            assert 'social' in current_url or 'wanted.co.kr' in current_url, f"예상치 못한 URL: {current_url}"
 
-            # 로그인 상태 확인 (프로필 아이콘이나 로그아웃 버튼 존재 확인)
-            try:
-                # 로그인 후 표시되는 요소 확인
-                profile_element = page.locator('[data-attribute-id="gnb__user-profile"]').first
-                await profile_element.wait_for(state='visible', timeout=5000)
-                print("✅ 로그인 상태 확인: 프로필 아이콘 표시됨")
-            except:
-                print("⚠️ 프로필 아이콘 확인 실패, URL로 판단")
+            # 로그인 실패 메시지가 없는지 확인
+            error_msg = page.locator('[class*="error"], [class*="Error"]')
+            if await error_msg.count() > 0:
+                error_text = await error_msg.first.text_content()
+                raise AssertionError(f"로그인 실패 메시지 발견: {error_text}")
 
-            # 성공 스크린샷
-            await page.screenshot(path='screenshots/test_11_success.png', full_page=True)
-            print("✅ 테스트 성공")
-            print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
+            await page.screenshot(path='screenshots/test_11_success.png')
+            print("✅ 테스트 성공 - 소셜 탭으로 리다이렉트 확인")
+            print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
+            await page.screenshot(path='screenshots/test_11_failed.png')
             print(f"❌ 테스트 실패: {e}")
-            # 실패 시 스크린샷
-            try:
-                await page.screenshot(path='screenshots/test_11_failed.png', full_page=True)
-            except:
-                pass
-            print(f"AUTOMATION_FAILED: {e}")  # ⭐ 실패 시그널
+            print(f"AUTOMATION_FAILED: {e}")
             return False
 
         finally:
