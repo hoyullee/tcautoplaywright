@@ -21,67 +21,58 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 1. 교육•이벤트 탭 진입
+            # 이메일 로그인 페이지 직접 접속
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
-            await page.goto('https://www.wanted.co.kr/', timeout=30000)
-            await page.wait_for_load_state('networkidle')
+            await page.goto('https://www.wanted.co.kr/', timeout=60000, wait_until='domcontentloaded')
+            await page.wait_for_timeout(2000)
             print("✅ 페이지 로드 완료")
 
-            # 교육•이벤트 GNB 탭 클릭
-            print("🖱️ 교육•이벤트 탭 클릭")
-            edu_tab = page.get_by_role('link', name='교육·이벤트')
-            if not await edu_tab.is_visible():
-                edu_tab = page.locator('a[href*="events"]').first
-            await edu_tab.click()
-            await page.wait_for_load_state('networkidle')
-            print(f"✅ 교육•이벤트 페이지 이동: {page.url}")
+            # 회원가입/로그인 버튼 클릭
+            print("🔍 회원가입/로그인 버튼 클릭 중...")
+            await page.get_by_text('회원가입/로그인', exact=True).click()
+            await page.wait_for_timeout(2000)
+            print("✅ 로그인 페이지 이동 완료")
 
-            # 2. 회원가입/로그인 페이지 진입
-            print("🖱️ 로그인 버튼 클릭")
-            login_btn = page.get_by_role('link', name='로그인')
-            if not await login_btn.is_visible():
-                login_btn = page.locator('a[href*="login"], button:has-text("로그인")').first
-            await login_btn.click()
-            await page.wait_for_load_state('networkidle')
-            print(f"✅ 로그인 페이지 이동: {page.url}")
-
-            # 3. 이메일로 계속하기 버튼 클릭
-            print("🖱️ 이메일로 계속하기 버튼 클릭")
+            # 이메일로 계속하기 클릭 (이메일 로그인 페이지 진입)
+            print("🔍 이메일로 계속하기 버튼 클릭 중...")
             email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
-            if not await email_continue_btn.is_visible():
-                email_continue_btn = page.locator('button:has-text("이메일로 계속하기")').first
+            await email_continue_btn.wait_for(state='visible', timeout=10000)
             await email_continue_btn.click()
-            await page.wait_for_load_state('networkidle')
-            print("✅ 이메일 로그인 폼 진입")
+            await page.wait_for_timeout(1000)
+            print("✅ 이메일 로그인 페이지 진입 완료")
 
-            # 4. 이메일 입력
-            print(f"✉️ 이메일 입력: {TEST_EMAIL}")
+            # 이메일 입력
+            print("✍️ 이메일 입력 중...")
             email_input = page.locator('input[type="email"]')
+            await email_input.wait_for(state='visible', timeout=10000)
             await email_input.fill(TEST_EMAIL)
+            print("✅ 이메일 입력 완료")
 
-            # 5. 비밀번호 입력
-            print("🔑 비밀번호 입력")
+            # 비밀번호 입력
+            print("✍️ 비밀번호 입력 중...")
             password_input = page.locator('input[type="password"]')
+            await password_input.wait_for(state='visible', timeout=10000)
             await password_input.fill(TEST_PASSWORD)
+            print("✅ 비밀번호 입력 완료")
 
-            # 6. 로그인 버튼 클릭
-            print("🖱️ 로그인 버튼 클릭")
-            submit_btn = page.get_by_role('button', name='로그인')
-            if not await submit_btn.is_visible():
-                submit_btn = page.locator('button[type="submit"]').first
-            await submit_btn.click()
-            await page.wait_for_load_state('networkidle')
-            print(f"✅ 로그인 완료. 현재 URL: {page.url}")
+            # 로그인 버튼 클릭
+            print("🔍 로그인 버튼 클릭 중...")
+            login_button = page.get_by_role('button', name='로그인')
+            await login_button.click()
+            print("✅ 로그인 버튼 클릭 완료")
 
-            # 7. 교육•이벤트 탭 리다이렉트 확인
+            # 로그인 후 www.wanted.co.kr으로 리다이렉트 대기
+            print("⏳ 로그인 후 리다이렉트 대기 중...")
+            await page.wait_for_url(
+                lambda url: url.startswith('https://www.wanted.co.kr'),
+                timeout=15000
+            )
+
+            # 채용 홈으로 리다이렉트 확인
             current_url = page.url
-            assert 'events' in current_url or 'wanted.co.kr' in current_url, \
-                f"로그인 후 예상치 못한 URL: {current_url}"
-
-            # 로그인 성공 여부 확인 (로그인 버튼이 사라졌는지 확인)
-            login_link_visible = await page.locator('a[href*="login"]').is_visible()
-            assert not login_link_visible or 'events' in current_url, \
-                "로그인이 완료되지 않았거나 리다이렉트 실패"
+            print(f"🔗 현재 URL: {current_url}")
+            assert current_url.startswith('https://www.wanted.co.kr'), f"예상치 못한 URL: {current_url}"
+            print("✅ 로그인 성공 및 채용 홈 리다이렉트 확인")
 
             await page.screenshot(path='screenshots/test_9_success.png')
             print("✅ 테스트 성공")

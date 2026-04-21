@@ -25,6 +25,14 @@ logging.basicConfig(
     ]
 )
 
+def load_context():
+    """context.md 파일 로드"""
+    context_file = 'context.md'
+    if os.path.exists(context_file):
+        with open(context_file, 'r', encoding='utf-8') as f:
+            return f.read()
+    return ""
+
 def create_claude_prompt(test_case):
     """Claude Code에 전달할 프롬프트"""
 
@@ -55,9 +63,13 @@ def create_claude_prompt(test_case):
 로그인이 필요한 경우 위 정보를 사용하세요.
 """
 
+    context_section = load_context()
+    if context_section:
+        context_section = f"\n## 프로젝트 컨텍스트\n{context_section}\n"
+
     prompt = f"""
 당신은 Playwright 테스트 자동화 전문가입니다.
-
+{context_section}
 ## 테스트 정보
 - 테스트 번호: {test_no}
 - URL: {base_url}

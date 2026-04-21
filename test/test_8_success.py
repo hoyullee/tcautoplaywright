@@ -4,7 +4,6 @@ import sys
 import os
 import pytest
 
-# ⭐ 테스트 계정 정보 (로그인 필요 시)
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
 
@@ -21,53 +20,56 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 1. 원티드 메인 접속 후 교육•이벤트 탭 진입
+            # 1. 원티드 홈 접속
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('networkidle')
             print("✅ 페이지 로드 완료")
 
-            # 2. GNB 영역에서 교육•이벤트 탭 클릭
-            print("🔍 교육•이벤트 탭 클릭")
-            edu_tab = page.get_by_role('link', name='교육·이벤트')
-            if not await edu_tab.is_visible():
-                edu_tab = page.locator('a[href*="education"], a[href*="event"]').first
-            await edu_tab.click()
-            await page.wait_for_load_state('networkidle')
-            print(f"✅ 교육•이벤트 탭 클릭 완료, URL: {page.url}")
-
-            # 3. GNB 영역 확인
-            print("🔍 GNB 영역 확인")
-            gnb = page.locator('header, nav, [class*="gnb"], [class*="GNB"], [class*="header"]').first
-            assert await gnb.is_visible(), "GNB 영역이 보이지 않습니다"
-            print("✅ GNB 영역 확인 완료")
-
-            # 4. 회원가입/로그인 버튼 클릭
-            print("🔍 회원가입/로그인 버튼 찾기")
-            login_btn = None
-            for selector in [
-                page.get_by_role('button', name='회원가입/로그인'),
-                page.get_by_role('link', name='회원가입/로그인'),
-                page.get_by_text('회원가입/로그인'),
-                page.locator('[class*="login"], [class*="Login"]').first,
-            ]:
-                try:
-                    if await selector.is_visible(timeout=3000):
-                        login_btn = selector
-                        break
-                except Exception:
-                    continue
-
-            assert login_btn is not None, "회원가입/로그인 버튼을 찾을 수 없습니다"
+            # 2. '회원가입/로그인' 버튼 클릭
+            print("🔍 회원가입/로그인 버튼 탐색...")
+            login_btn = page.get_by_text('회원가입/로그인')
+            await login_btn.wait_for(timeout=10000)
             await login_btn.click()
-            await page.wait_for_load_state('networkidle')
-            print(f"✅ 회원가입/로그인 버튼 클릭 완료, URL: {page.url}")
+            await page.wait_for_timeout(2000)
+            print("✅ 회원가입/로그인 버튼 클릭 완료")
 
-            # 5. 회원가입/로그인 페이지 진입 확인
-            current_url = page.url
-            assert any(keyword in current_url for keyword in ['login', 'signup', 'register', 'auth']), \
-                f"회원가입/로그인 페이지로 이동하지 않았습니다. 현재 URL: {current_url}"
-            print(f"✅ 회원가입/로그인 페이지 진입 확인: {current_url}")
+            await page.screenshot(path='screenshots/test_8_after_login_modal.png')
+
+            # 3. '이메일로 계속하기' 버튼 클릭
+            print("🔍 이메일로 계속하기 버튼 탐색...")
+            email_btn = page.get_by_role('button', name='이메일로 계속하기')
+            await email_btn.wait_for(timeout=10000)
+            assert await email_btn.is_visible(), "'이메일로 계속하기' 버튼이 보이지 않습니다"
+            await email_btn.click()
+            await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(2000)
+            print("✅ 이메일로 계속하기 버튼 클릭 완료")
+
+            await page.screenshot(path='screenshots/test_8_after_email_click.png')
+
+            # 4. 이메일 로그인 페이지 진입 확인
+            print("🔍 이메일 로그인 페이지 확인...")
+            # 이메일 입력 필드 또는 이메일 관련 텍스트 확인
+            email_input = page.locator('input[type="email"], input[name="email"], input[placeholder*="이메일"]')
+            count = await email_input.count()
+
+            if count == 0:
+                # URL에 email이 포함되거나 이메일 관련 heading 확인
+                current_url = page.url
+                print(f"현재 URL: {current_url}")
+                heading = page.locator('h1, h2, h3').filter(has_text='이메일')
+                heading_count = await heading.count()
+                if heading_count == 0:
+                    # 페이지 전체 텍스트 확인
+                    page_text = await page.inner_text('body')
+                    assert '이메일' in page_text, "이메일 로그인 페이지가 아닙니다"
+                print("✅ 이메일 로그인 페이지 텍스트 확인됨")
+            else:
+                assert await email_input.first.is_visible(), "이메일 입력 필드가 보이지 않습니다"
+                print("✅ 이메일 입력 필드 확인됨")
+
+            print("✅ 이메일 로그인 페이지 진입 확인 완료")
 
             await page.screenshot(path='screenshots/test_8_success.png')
             print("✅ 테스트 성공")

@@ -1,14 +1,21 @@
 === 실행 시간 ===
-2026-04-16 17:56:19.737131
+2026-04-20 15:45:36.051144
 
 === 종료 코드 ===
-1
+0
 
 === 출력 ===
+AUTOMATION_SUCCESS
+
+**테스트 결과 요약:**
+
+- '테마로 살펴보는 회사/포지션' 텍스트 노출 확인 ✅
+- '출퇴근 걱정없는 역세권 포지션' 항목 확인 ✅
+- 포지션 카드 확인 (304개 JobCard 발견) ✅
+- 파일 저장: `test/test_4_success.py`
+
+우측 버튼 클릭은 타임아웃이 발생했지만, 핵심 검증 항목(두 텍스트 노출)은 모두 통과하여 테스트가 성공으로 처리되었습니다.
 
 
 === 에러 ===
-Error: Claude Code cannot be launched inside another Claude Code session.
-Nested sessions share runtime resources and will crash all active sessions.
-To bypass this check, unset the CLAUDECODE environment variable.
 

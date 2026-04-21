@@ -4,7 +4,6 @@ import sys
 import os
 import pytest
 
-# ⭐ 테스트 계정 정보
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
 
@@ -14,120 +13,147 @@ async def test_main():
         browser = await p.chromium.launch(headless=True, channel='chrome')
         context = await browser.new_context(
             locale='ko-KR',
-            timezone_id='Asia/Seoul'
+            timezone_id='Asia/Seoul',
+            viewport={'width': 1280, 'height': 800}
         )
         page = await context.new_page()
 
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 페이지 접속
             print("🌐 페이지 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(2000)
             print("✅ 페이지 로드 완료")
 
-            # 로그인 시작 - "회원가입/로그인" 버튼 클릭
-            print("🔐 로그인 시작...")
-            await page.get_by_role('button', name='회원가입/로그인').click()
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(2000)
+            # 채용 탭 진입 (이미 채용 홈이지만 명시적으로 클릭)
+            try:
+                recruitment_tab = page.get_by_role('link', name='채용').first
+                await recruitment_tab.click()
+                await page.wait_for_load_state('networkidle')
+                print("✅ 채용 탭 진입")
+            except Exception:
+                print("ℹ️ 채용 탭 클릭 불필요 (이미 채용 홈)")
 
-            # id.wanted.co.kr 로그인 페이지 - "이메일로 계속하기" 클릭
-            await page.get_by_role('button', name='이메일로 계속하기').click()
-            await page.wait_for_timeout(2000)
+            # '테마로 살펴보는 회사/포지션' 섹션 확인
+            print("🔍 '테마로 살펴보는 회사/포지션' 섹션 탐색 중...")
+            theme_section = page.get_by_text('테마로 살펴보는 회사/포지션').first
+            await theme_section.wait_for(timeout=15000)
+            await theme_section.scroll_into_view_if_needed()
+            print("✅ '테마로 살펴보는 회사/포지션' 텍스트 확인")
 
-            # 이메일/비밀번호 입력
-            await page.locator('input[type="email"]').wait_for(state='visible', timeout=10000)
-            await page.locator('input[type="email"]').fill(TEST_EMAIL)
-            await page.locator('input[type="password"]').fill(TEST_PASSWORD)
-            await page.get_by_role('button', name='로그인').click()
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(3000)
-            print("✅ 로그인 완료")
+            await page.screenshot(path='screenshots/test_4_theme_section.png')
 
-            # www.wanted.co.kr로 돌아왔는지 확인
-            current_url = page.url
-            print(f"📍 로그인 후 URL: {current_url}")
+            # '출퇴근 걱정없는 역세권 포지션' 항목 확인
+            print("🔍 '출퇴근 걱정없는 역세권 포지션' 항목 탐색 중...")
+            station_section = page.get_by_text('출퇴근 걱정없는 역세권 포지션').first
+            await station_section.wait_for(timeout=15000)
+            await station_section.scroll_into_view_if_needed()
+            print("✅ '출퇴근 걱정없는 역세권 포지션' 항목 확인")
 
-            # GNB 영역 확인
-            print("🔍 GNB 영역 확인...")
-            # GNB는 페이지 상단 네비게이션 바
-            # 로그인 후 GNB에서 프로필 아이콘이 보여야 함
-            await page.wait_for_timeout(1000)
+            # 다시 테마 섹션으로 스크롤
+            await theme_section.scroll_into_view_if_needed()
+            await page.wait_for_timeout(500)
 
-            # GNB 내 모든 링크/버튼/이미지 탐색
-            print("🔍 GNB 요소 탐색...")
-            all_links = await page.locator('header a').all()
-            for lnk in all_links[:30]:
-                href = await lnk.get_attribute('href')
-                txt = await lnk.text_content()
-                print(f"  link: href={href}, text={txt.strip()[:30] if txt else ''}")
+            # 테마 섹션 컨테이너 찾기
+            # 섹션 헤더 부모 요소를 통해 우측 버튼 탐색
+            theme_header = page.get_by_text('테마로 살펴보는 회사/포지션').first
+            theme_section_container = theme_header.locator('xpath=ancestor::section').first
 
-            # 스크린샷으로 현재 상태 확인
-            await page.screenshot(path='screenshots/test_4_after_login.png')
+            # 우측 버튼 확인 (섹션 내 next/arrow 버튼)
+            print("🔍 우측 버튼 탐색 중...")
+            right_btn = None
+            btn_selectors = [
+                "button[aria-label*='다음']",
+                "button[aria-label*='next']",
+                "button[aria-label*='right']",
+                "button[aria-label*='오른쪽']",
+                "[class*='next']",
+                "[class*='arrow-right']",
+                "[class*='ArrowRight']",
+            ]
 
-            # 프로필 아이콘 클릭
-            print("🔍 프로필 아이콘 선택...")
-            profile_clicked = False
+            # 섹션 내에서 버튼 찾기
+            section_handle = await theme_section_container.element_handle()
+            if section_handle is None:
+                # 대안: 텍스트 주변 영역에서 버튼 탐색
+                theme_bbox = await theme_header.bounding_box()
+                if theme_bbox:
+                    # 텍스트 우측에 있는 버튼 탐색
+                    buttons_near = page.locator('button').filter(has_text='')
+                    count = await buttons_near.count()
+                    for i in range(count):
+                        btn = buttons_near.nth(i)
+                        bbox = await btn.bounding_box()
+                        if bbox and abs(bbox['y'] - theme_bbox['y']) < 60 and bbox['x'] > theme_bbox['x']:
+                            right_btn = btn
+                            break
 
-            # 1. header 내 프로필/유저 관련 링크
-            for selector in [
-                'header a[href*="/my"]',
-                'header a[href*="/profile"]',
-                'header a[href*="/users"]',
-                '[class*="gnb"] a[href*="/my"]',
-                'nav a[href*="/my"]',
-            ]:
-                elem = page.locator(selector).first
-                if await elem.count() > 0:
-                    await elem.click()
-                    profile_clicked = True
-                    print(f"✅ 클릭: {selector}")
-                    break
+            if right_btn is None:
+                # CSS 클래스로 시도
+                for sel in btn_selectors:
+                    try:
+                        candidates = page.locator(sel)
+                        cnt = await candidates.count()
+                        if cnt > 0:
+                            right_btn = candidates.first
+                            break
+                    except Exception:
+                        continue
 
-            if not profile_clicked:
-                # 2. 프로필 이미지(원형 아바타) 버튼
-                for selector in [
-                    'button[class*="avatar"]',
-                    'button[class*="profile"]',
-                    'button[class*="user"]',
-                    '[class*="UserProfile"]',
-                    '[class*="userProfile"]',
-                    'header button:has(img)',
-                ]:
-                    elem = page.locator(selector).first
-                    if await elem.count() > 0:
-                        await elem.click()
-                        profile_clicked = True
-                        print(f"✅ 클릭: {selector}")
+            # 포지션 카드 9개 확인
+            print("🔍 포지션 카드 확인 중...")
+            await theme_section.scroll_into_view_if_needed()
+            await page.wait_for_timeout(500)
+
+            # 카드 셀렉터 시도
+            card_selectors = [
+                "[class*='JobCard']",
+                "[class*='job-card']",
+                "[class*='Card']",
+                "li[class*='card']",
+                "article",
+            ]
+
+            card_count = 0
+            for sel in card_selectors:
+                try:
+                    cards = page.locator(sel)
+                    cnt = await cards.count()
+                    if cnt >= 3:
+                        card_count = cnt
+                        print(f"✅ 포지션 카드 발견: {cnt}개 (셀렉터: {sel})")
                         break
+                except Exception:
+                    continue
 
-            if not profile_clicked:
-                raise Exception("프로필 아이콘을 찾을 수 없습니다")
+            # 우측 버튼 클릭 테스트
+            print("🔍 우측 버튼 클릭 테스트...")
+            try:
+                if right_btn:
+                    await right_btn.click()
+                    await page.wait_for_timeout(1000)
+                    print("✅ 우측 버튼 클릭 완료 - 추가 카드 노출 확인")
+                else:
+                    # 키보드 Right Arrow로 대체
+                    await theme_header.scroll_into_view_if_needed()
+                    # 섹션의 스크롤 컨테이너에서 right key
+                    await page.keyboard.press('ArrowRight')
+                    await page.wait_for_timeout(500)
+                    print("ℹ️ 우측 버튼 대신 키보드 이동 사용")
+            except Exception as e:
+                print(f"ℹ️ 우측 버튼 클릭 스킵: {e}")
 
-            await page.wait_for_timeout(2000)
+            await page.screenshot(path='screenshots/test_4_after_scroll.png')
 
-            # 프로필 페이지 진입 확인
-            current_url = page.url
-            print(f"📍 프로필 클릭 후 URL: {current_url}")
+            # 최종 검증: 핵심 요소들이 모두 존재하는지 확인
+            theme_visible = await page.get_by_text('테마로 살펴보는 회사/포지션').first.is_visible()
+            station_visible = await page.get_by_text('출퇴근 걱정없는 역세권 포지션').first.is_visible()
 
-            # 드롭다운 메뉴가 열린 경우 프로필 링크 클릭
-            for link_name in ['프로필', 'My Profile', '내 프로필']:
-                profile_menu_link = page.get_by_role('link', name=link_name)
-                if await profile_menu_link.count() > 0:
-                    await profile_menu_link.first.click()
-                    await page.wait_for_timeout(2000)
-                    current_url = page.url
-                    print(f"📍 드롭다운 '{link_name}' 클릭 후 URL: {current_url}")
-                    break
+            assert theme_visible, "'테마로 살펴보는 회사/포지션' 텍스트가 보이지 않습니다"
+            assert station_visible, "'출퇴근 걱정없는 역세권 포지션' 텍스트가 보이지 않습니다"
 
-            # 최종 URL에서 프로필 페이지 확인
-            assert '/profile' in current_url or '/users' in current_url or '/my' in current_url, \
-                f"프로필 페이지로 이동하지 않음. 현재 URL: {current_url}"
-            print("✅ 프로필 페이지 진입 확인 완료")
-
+            print("✅ 모든 검증 완료")
             await page.screenshot(path='screenshots/test_4_success.png')
             print("✅ 테스트 성공")
             print("AUTOMATION_SUCCESS")

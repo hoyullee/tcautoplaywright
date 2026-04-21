@@ -1,0 +1,148 @@
+
+당신은 Playwright 테스트 자동화 전문가입니다.
+
+## 테스트 정보
+- 테스트 번호: 15
+- URL: https://www.wanted.co.kr/
+- 환경: PC
+- 기능영역: GNB > 교육•이벤트 > 회원가입/로그인
+- 사전조건: 1. 교육•이벤트 탭 진입 상태
+2. 회원가입/로그인 페이지 진입 상태
+- 확인사항: 1. 이메일로 계속하기 버튼 선택
+2. 이메일 및 비밀번호 입력
+2. 로그인 버튼 선택
+- 기대결과: 정상적으로 로그인되며 교육•이벤트 탭 페이지로 리다이렉트
+
+
+## 🔐 테스트 계정 정보
+⚠️ **중요**: 다음 테스트 계정을 사용하세요
+- 이메일: hoyul.lee+1@wantedlab.com
+- 비밀번호: wanted12!@
+
+로그인이 필요한 경우 위 정보를 사용하세요.
+
+
+---
+
+## 작업 지시
+
+### 1단계: 파일 생성
+test/test_15_working.py 파일을 생성하세요.
+
+### 2단계: 코드 작성
+
+⚠️ **중요**: Playwright는 **비동기(async/await)** 라이브러리입니다!
+
+다음 구조로 **완전히 작동하는** Playwright Python 코드를 작성하세요:
+```python
+from playwright.async_api import async_playwright
+import asyncio
+import sys
+import os
+import pytest
+
+# ⭐ 테스트 계정 정보 (로그인 필요 시)
+TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
+TEST_PASSWORD = "wanted12!@"
+
+@pytest.mark.asyncio
+async def test_main():
+    async with async_playwright() as p:
+        # 브라우저 실행
+        browser = await p.chromium.launch(headless=True)
+        
+        # 한국어 설정
+        context = await browser.new_context(
+            locale='ko-KR',
+            timezone_id='Asia/Seoul'
+        )
+        page = await context.new_page()
+        
+        try:
+            # screenshots 폴더 생성
+            os.makedirs('screenshots', exist_ok=True)
+            
+            # 페이지 접속
+            print("🌐 페이지 접속: https://www.wanted.co.kr/")
+            await page.goto('https://www.wanted.co.kr/', timeout=30000)
+            await page.wait_for_load_state('networkidle')
+            print("✅ 페이지 로드 완료")
+            
+            # ========================================
+            # 여기에 테스트 로직 작성
+            # ========================================
+            # 확인사항: 1. 이메일로 계속하기 버튼 선택
+2. 이메일 및 비밀번호 입력
+2. 로그인 버튼 선택
+            #
+            # ⚠️ 중요: 모든 Playwright 메서드에 await 사용!
+            #
+            # 로케이터 우선순위:
+            # 1. await page.get_by_role('button', name='정확한텍스트').click()
+            # 2. await page.get_by_text('정확한텍스트').click()
+            # 3. await page.locator('css-selector').click()
+            #
+            # 로그인 필요 시 예시:
+            # email_input = page.get_by_label('이메일') 또는 page.locator('input[type="email"]')
+            # await email_input.fill(TEST_EMAIL)
+            # 
+            # password_input = page.get_by_label('비밀번호') 또는 page.locator('input[type="password"]')
+            # await password_input.fill(TEST_PASSWORD)
+            # 
+            # login_button = page.get_by_role('button', name='로그인')
+            # await login_button.click()
+            # await page.wait_for_load_state('networkidle')
+            
+            # 성공 스크린샷
+            await page.screenshot(path='screenshots/test_15_success.png')
+            print("✅ 테스트 성공")
+            print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
+            return True
+            
+        except Exception as e:
+            # 실패 스크린샷
+            await page.screenshot(path='screenshots/test_15_failed.png')
+            print(f"❌ 테스트 실패: {e}")
+            print(f"AUTOMATION_FAILED: {e}")  # ⭐ 실패 시그널
+            return False
+            
+        finally:
+            await browser.close()
+
+if __name__ == "__main__":
+    result = asyncio.run(test_main())
+    sys.exit(0 if result else 1)
+```
+
+### 3단계: 필수 체크리스트
+
+✅ **async/await 체크리스트** (반드시 확인!):
+- [ ] `async def main():`로 시작
+- [ ] `async with async_playwright() as p:`
+- [ ] `await p.chromium.launch()`
+- [ ] `await browser.new_context()`
+- [ ] `await context.new_page()`
+- [ ] `await page.goto()`
+- [ ] `await page.wait_for_load_state()`
+- [ ] `await page.click()` 또는 `await element.click()`
+- [ ] `await page.fill()`
+- [ ] `await page.screenshot()`
+- [ ] `await browser.close()`
+- [ ] `asyncio.run(main())`로 실행
+
+### 4단계: 코드 실행
+작성한 코드를 실행하세요: python test/test_15_working.py
+
+### 5단계: 결과 처리
+- 성공하면 test/test_15_success.py로 이름 변경
+- 실패하면 에러 분석 후 코드 수정하고 재시도
+
+### 6단계: 최종 출력
+반드시 다음 중 하나를 출력하세요:
+- AUTOMATION_SUCCESS
+- AUTOMATION_FAILED: 에러메시지
+
+⚠️ **다시 한번 강조**: Playwright의 모든 메서드는 **비동기**입니다!
+await를 빠뜨리면 코드가 작동하지 않습니다!
+
+지금 바로 시작하세요!
