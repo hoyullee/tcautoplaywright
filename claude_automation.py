@@ -25,6 +25,8 @@ logging.basicConfig(
     ]
 )
 
+AUTH_STATE_FILE = 'work/auth_state.json'
+
 def load_context():
     """context.md 파일 로드"""
     context_file = 'context.md'
@@ -33,35 +35,70 @@ def load_context():
             return f.read()
     return ""
 
+def is_login_precondition(test_case):
+    """사전조건이 '로그인 상태'인지 확인 → 저장된 세션 사용"""
+    return '로그인 상태' in test_case.get('사전조건', '')
+
+def is_login_action_test(test_case):
+    """실제 로그인을 수행하고 세션을 저장해야 하는 케이스인지 확인"""
+    precondition = test_case.get('사전조건', '')
+    expected = test_case.get('기대결과', '')
+    checks = test_case.get('확인사항', '')
+    return (
+        '로그인 상태' not in precondition and
+        ('로그인' in expected or '로그인 버튼' in checks)
+    )
+
 def create_claude_prompt(test_case):
     """Claude Code에 전달할 프롬프트"""
 
-    # ⭐ 변수 선언 한 번만 (중복 제거)
     test_email = os.getenv('WANTED_TEST_EMAIL', '')
     test_password = os.getenv('WANTED_TEST_PASSWORD', '')
     test_no = test_case.get('NO', '')
     function_area = test_case.get('기능영역', '')
-    
-    # URL 결정
-    if '회원가입' in function_area or '로그인' in function_area:
-        base_url = 'https://www.wanted.co.kr/'
-    else:
-        base_url = 'https://www.wanted.co.kr/'
-    
-    # 로그인 관련 테스트인지 확인
-    is_login_test = '로그인' in function_area or '로그인' in test_case.get('확인사항', '')
-    
-    # 로그인 정보 섹션
+    base_url = 'https://www.wanted.co.kr/'
+
+    use_saved_session = is_login_precondition(test_case)
+    save_session = is_login_action_test(test_case)
+
+    # 로그인 정보 섹션 (로그인 수행 케이스에만 표시)
     login_info_section = ""
-    if is_login_test and test_email and test_password:
+    if save_session and test_email and test_password:
         login_info_section = f"""
 ## 🔐 테스트 계정 정보
 ⚠️ **중요**: 다음 테스트 계정을 사용하세요
 - 이메일: {test_email}
 - 비밀번호: {test_password}
-
-로그인이 필요한 경우 위 정보를 사용하세요.
 """
+
+    # 세션 관련 지시 섹션
+    if use_saved_session:
+        session_instruction = f"""
+## 🔑 로그인 세션 재사용
+⚠️ **중요**: 이 테스트는 사전조건이 '로그인 상태'입니다.
+직접 로그인하지 말고, 저장된 세션 파일을 로드하세요.
+
+브라우저 컨텍스트 생성 시 반드시 아래와 같이 storage_state를 지정하세요:
+```python
+context = await browser.new_context(
+    storage_state='{AUTH_STATE_FILE}',
+    locale='ko-KR',
+    timezone_id='Asia/Seoul'
+)
+```
+"""
+    elif save_session:
+        session_instruction = f"""
+## 💾 로그인 세션 저장
+⚠️ **중요**: 이 테스트는 로그인을 수행합니다.
+로그인 성공 후 반드시 세션을 저장하세요:
+```python
+await context.storage_state(path='{AUTH_STATE_FILE}')
+print("✅ 로그인 세션 저장 완료")
+```
+"""
+    else:
+        session_instruction = ""
 
     context_section = load_context()
     if context_section:
@@ -80,6 +117,7 @@ def create_claude_prompt(test_case):
 - 기대결과: {test_case.get('기대결과', '')}
 
 {login_info_section}
+{session_instruction}
 
 ---
 
@@ -109,24 +147,24 @@ async def test_main():
     async with async_playwright() as p:
         # 브라우저 실행
         browser = await p.chromium.launch(headless=True)
-        
+
         # 한국어 설정
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul'
         )
         page = await context.new_page()
-        
+
         try:
             # screenshots 폴더 생성
             os.makedirs('screenshots', exist_ok=True)
-            
+
             # 페이지 접속
             print("🌐 페이지 접속: {base_url}")
             await page.goto('{base_url}', timeout=30000)
             await page.wait_for_load_state('networkidle')
             print("✅ 페이지 로드 완료")
-            
+
             # ========================================
             # 여기에 테스트 로직 작성
             # ========================================
@@ -138,31 +176,20 @@ async def test_main():
             # 1. await page.get_by_role('button', name='정확한텍스트').click()
             # 2. await page.get_by_text('정확한텍스트').click()
             # 3. await page.locator('css-selector').click()
-            #
-            # 로그인 필요 시 예시:
-            # email_input = page.get_by_label('이메일') 또는 page.locator('input[type="email"]')
-            # await email_input.fill(TEST_EMAIL)
-            # 
-            # password_input = page.get_by_label('비밀번호') 또는 page.locator('input[type="password"]')
-            # await password_input.fill(TEST_PASSWORD)
-            # 
-            # login_button = page.get_by_role('button', name='로그인')
-            # await login_button.click()
-            # await page.wait_for_load_state('networkidle')
-            
+
             # 성공 스크린샷
             await page.screenshot(path='screenshots/test_{test_no}_success.png')
             print("✅ 테스트 성공")
             print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
             return True
-            
+
         except Exception as e:
             # 실패 스크린샷
             await page.screenshot(path='screenshots/test_{test_no}_failed.png')
             print(f"❌ 테스트 실패: {{e}}")
             print(f"AUTOMATION_FAILED: {{e}}")  # ⭐ 실패 시그널
             return False
-            
+
         finally:
             await browser.close()
 
@@ -204,7 +231,7 @@ await를 빠뜨리면 코드가 작동하지 않습니다!
 
 지금 바로 시작하세요!
 """
-    
+
     return prompt
 
 def run_claude_code(prompt, test_no, max_attempts=3):
