@@ -1,11 +1,20 @@
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 from playwright.async_api import async_playwright
 import asyncio
-import sys
 import os
 import pytest
 
 TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
 TEST_PASSWORD = "wanted12!@"
+
+REAL_UA = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/124.0.0.0 Safari/537.36'
+)
 
 @pytest.mark.asyncio
 async def test_main():
@@ -14,156 +23,92 @@ async def test_main():
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul',
-            viewport={'width': 1280, 'height': 800}
+            user_agent=REAL_UA,
+            viewport={'width': 1280, 'height': 800},
         )
         page = await context.new_page()
 
         try:
             os.makedirs('screenshots', exist_ok=True)
+            os.makedirs('work', exist_ok=True)
 
-            print("🌐 페이지 접속: https://www.wanted.co.kr/")
+            # [사전조건] 회원가입/로그인 페이지 진입
+            print("[INFO] 채용 홈 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
-            await page.wait_for_load_state('networkidle')
-            print("✅ 페이지 로드 완료")
+            await page.wait_for_load_state('load')
+            await page.wait_for_timeout(3000)
+            print("[OK] 페이지 로드 완료")
 
-            # 채용 탭 확인 (기본 진입 상태)
-            print("🔍 채용 탭 확인 중...")
-            await page.screenshot(path='screenshots/test_2_step1_home.png')
+            # GNB 로그인 버튼 클릭하여 로그인 페이지 진입
+            print("[INFO] 회원가입/로그인 버튼 클릭...")
+            clicked = await page.evaluate("""() => {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const loginBtn = buttons.find(b =>
+                    b.innerText.includes('회원가입') ||
+                    b.innerText.includes('로그인')
+                );
+                if (loginBtn) {
+                    loginBtn.click();
+                    return loginBtn.innerText.trim();
+                }
+                return null;
+            }""")
+            assert clicked is not None, "회원가입/로그인 버튼을 찾을 수 없습니다"
+            print(f"[OK] 버튼 클릭됨: {clicked}")
 
-            # '모두가 주목하고 있어요!' 섹션 확인
-            print("🔍 '모두가 주목하고 있어요!' 섹션 탐색 중...")
-            attention_section = page.get_by_text('모두가 주목하고 있어요')
-            await attention_section.wait_for(timeout=10000)
-            print("✅ '모두가 주목하고 있어요!' 섹션 확인됨")
+            await page.wait_for_url('**/login**', timeout=15000)
+            await page.wait_for_load_state('load')
+            await page.wait_for_timeout(2000)
+            print(f"[OK] 로그인 페이지 진입: {page.url}")
+            await page.screenshot(path='screenshots/test_2_step1_login_page.png')
 
-            # '지금 주목할 소식' 섹션 확인
-            print("🔍 '지금 주목할 소식' 섹션 탐색 중...")
-            news_section = page.get_by_text('지금 주목할 소식')
-            await news_section.wait_for(timeout=10000)
-            print("✅ '지금 주목할 소식' 텍스트 노출 확인됨")
+            # [확인사항] 이메일로 계속하기 버튼 선택
+            print("[INFO] '이메일로 계속하기' 버튼 클릭...")
+            email_btn = page.get_by_role('button', name='이메일로 계속하기')
+            await email_btn.wait_for(timeout=10000)
+            await email_btn.click()
+            await page.wait_for_timeout(2000)
+            print("[OK] '이메일로 계속하기' 버튼 클릭 완료")
 
-            # '지금 주목할 소식' 섹션으로 스크롤
-            await news_section.scroll_into_view_if_needed()
-            await page.wait_for_timeout(1000)
-            await page.screenshot(path='screenshots/test_2_step2_news_section.png')
+            # [기대결과] 이메일로 로그인 페이지 진입 확인
+            print("[INFO] 이메일 로그인 폼 확인 중...")
+            await page.screenshot(path='screenshots/test_2_step2_email_form.png')
 
-            # 콘텐츠 카드 3개 이상 확인
-            # 섹션 컨테이너 내 카드 확인
-            print("🔍 콘텐츠 카드 확인 중...")
+            email_input = page.locator('#email, input[type="email"], input[name="email"]').first
+            await email_input.wait_for(timeout=10000)
+            assert await email_input.is_visible(), "이메일 입력 필드가 보이지 않습니다"
+            print("[OK] 이메일 입력 필드 확인 완료 - 이메일 로그인 페이지 진입 확인")
 
-            # '지금 주목할 소식' 텍스트를 포함하는 섹션의 부모 찾기
-            # 카드 요소를 다양한 선택자로 탐색
-            card_selectors = [
-                'article',
-                '[class*="card"]',
-                '[class*="Card"]',
-                '[class*="item"]',
-                '[class*="Item"]',
-            ]
+            # 로그인 완료 후 세션 저장
+            print("[INFO] 이메일/비밀번호 입력 및 로그인...")
+            await email_input.fill(TEST_EMAIL)
 
-            cards_found = False
-            card_count = 0
-            for selector in card_selectors:
-                cards = page.locator(selector)
-                count = await cards.count()
-                if count >= 3:
-                    card_count = count
-                    cards_found = True
-                    print(f"✅ 콘텐츠 카드 {count}개 확인됨 (selector: {selector})")
-                    break
+            password_input = page.locator('input[type="password"]').first
+            await password_input.fill(TEST_PASSWORD)
+            print("[OK] 계정 정보 입력 완료")
 
-            if not cards_found:
-                # '지금 주목할 소식' 섹션 근처의 링크/카드 확인
-                # 섹션 내부 a 태그 기반 카드 확인
-                section_handle = await news_section.element_handle()
-                if section_handle:
-                    parent = await page.evaluate("""
-                        (el) => {
-                            let parent = el.parentElement;
-                            for (let i = 0; i < 5; i++) {
-                                if (parent) parent = parent.parentElement;
-                            }
-                            return parent ? parent.querySelectorAll('a').length : 0;
-                        }
-                    """, section_handle)
-                    print(f"섹션 근처 링크 수: {parent}")
-                    if parent >= 3:
-                        cards_found = True
-                        card_count = parent
+            submit_btn = page.get_by_role('button', name='로그인')
+            await submit_btn.click()
+            print("[OK] 로그인 제출")
 
-            assert cards_found, f"콘텐츠 카드가 3개 미만이거나 찾을 수 없음 (found: {card_count})"
-            print(f"✅ 콘텐츠 카드 {card_count}개 이상 노출 확인됨")
+            await page.wait_for_load_state('load', timeout=20000)
+            await page.wait_for_timeout(2000)
+            print(f"[OK] 로그인 후 URL: {page.url}")
 
-            # 우측 버튼(스크롤 버튼) 확인 및 클릭
-            print("🔍 우측 스크롤 버튼 탐색 중...")
-            right_btn_selectors = [
-                'button[aria-label*="next"]',
-                'button[aria-label*="다음"]',
-                'button[aria-label*="right"]',
-                'button[aria-label*="오른쪽"]',
-                '[class*="next"] button',
-                '[class*="Next"] button',
-                '[class*="arrow"] button',
-                '[class*="Arrow"] button',
-                'button[class*="next"]',
-                'button[class*="Next"]',
-                'button[class*="right"]',
-                'button[class*="Right"]',
-            ]
-
-            right_btn = None
-            for selector in right_btn_selectors:
-                btn = page.locator(selector).first
-                if await btn.count() > 0:
-                    try:
-                        await btn.wait_for(state='visible', timeout=2000)
-                        right_btn = btn
-                        print(f"✅ 우측 버튼 발견 (selector: {selector})")
-                        break
-                    except Exception:
-                        continue
-
-            if right_btn is None:
-                # SVG 기반 화살표 버튼 탐색
-                btns = page.locator('button')
-                btn_count = await btns.count()
-                for i in range(btn_count):
-                    btn = btns.nth(i)
-                    try:
-                        is_visible = await btn.is_visible()
-                        if not is_visible:
-                            continue
-                        # 버튼 위치 확인 - 우측에 있는 버튼
-                        box = await btn.bounding_box()
-                        if box and box['x'] > 900:  # 화면 우측
-                            right_btn = btn
-                            print(f"✅ 우측 위치 버튼 발견 (x={box['x']})")
-                            break
-                    except Exception:
-                        continue
-
-            if right_btn:
-                await page.screenshot(path='screenshots/test_2_step3_before_scroll.png')
-                try:
-                    await right_btn.click(timeout=5000, force=True)
-                    await page.wait_for_timeout(1000)
-                    await page.screenshot(path='screenshots/test_2_step4_after_scroll.png')
-                    print("✅ 우측 버튼 클릭 후 스크롤 동작 확인됨")
-                except Exception as click_err:
-                    print(f"⚠️ 버튼 클릭 중 오류: {click_err}")
-                    await page.screenshot(path='screenshots/test_2_step4_after_scroll.png')
-            else:
-                print("⚠️ 우측 스크롤 버튼을 찾을 수 없음 (섹션 구조에 따라 다를 수 있음)")
-                # 버튼을 찾지 못해도 핵심 확인사항(텍스트 노출, 카드 3개)은 통과됨
+            await context.storage_state(path='work/auth_state.json')
+            print("[OK] 로그인 세션 저장 완료")
 
             await page.screenshot(path='screenshots/test_2_success.png')
-            print("✅ 테스트 성공")
+            print("[OK] 테스트 성공")
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_2_failed.png')
-            print(f"❌ 테스트 실패: {e}")
+            try:
+                await page.screenshot(path='screenshots/test_2_failed.png')
+            except Exception:
+                pass
+            print(f"[FAIL] 테스트 실패: {e}")
             print(f"AUTOMATION_FAILED: {e}")
             return False
 

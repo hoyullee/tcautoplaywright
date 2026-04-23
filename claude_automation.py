@@ -1,6 +1,8 @@
 import json
 import subprocess
 import os
+import sys
+import shutil
 import time
 import logging
 import argparse
@@ -252,14 +254,15 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                     '--print',
                     '--model', 'sonnet',
                     '--dangerously-skip-permissions',
-                    prompt
                 ],
+                input=prompt,
                 capture_output=True,
                 text=True,
                 timeout=300,
                 cwd=os.getcwd(),
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                shell=sys.platform == 'win32'
             )
             
             output = result.stdout
@@ -288,7 +291,7 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                 logging.info(f"📝 작업 파일 발견: {working_file}")
                 # 성공 파일로 이름 변경
                 try:
-                    os.rename(working_file, success_file)
+                    shutil.move(working_file, success_file)
                     logging.info(f"✅ 파일명 변경: {success_file}")
                 except Exception as e:
                     logging.warning(f"⚠️ 파일명 변경 실패: {e}")
