@@ -1,0 +1,29 @@
+=== 실행 시간 ===
+2026-04-24 17:21:44.165072
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+✅ **AUTOMATION_SUCCESS**
+
+## 테스트 결과 요약
+
+**TC23 - 채용 홈 > GNB > 프리랜서 클릭**
+
+| 항목 | 내용 |
+|------|------|
+| 파일 | `test/test_23_success.py` |
+| 상태 | ✅ 성공 |
+| 스크린샷 | `screenshots/test_23_success.png` |
+
+**실행 흐름:**
+1. 채용 홈(`https://www.wanted.co.kr/`) 접속 (비로그인 상태)
+2. GNB에서 `href*="gigs/experts"` 링크 탐색 → 발견
+3. 링크 속성 확인: `target="_blank"` (새 탭 오픈 방식)
+4. 새 탭 감지 후 클릭 → 새 탭에서 `https://www.wanted.co.kr/gigs/experts` 진입 확인
+5. URL에 `gigs/experts` 포함 여부 assertion 통과
+
+
+=== 에러 ===
+

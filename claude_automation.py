@@ -29,13 +29,6 @@ logging.basicConfig(
 
 AUTH_STATE_FILE = 'work/auth_state.json'
 
-def load_context():
-    """context.md 파일 로드"""
-    context_file = 'context.md'
-    if os.path.exists(context_file):
-        with open(context_file, 'r', encoding='utf-8') as f:
-            return f.read()
-    return ""
 
 def is_login_precondition(test_case):
     """사전조건이 '로그인 상태'인지 확인 → 저장된 세션 사용"""
@@ -52,208 +45,73 @@ def is_login_action_test(test_case):
     )
 
 def create_claude_prompt(test_case):
-    """Claude Code에 전달할 프롬프트"""
+    """Claude Code에 전달할 프롬프트 (TC 고유 정보만 포함, 정적 내용은 system_prompt.txt로 분리)"""
 
     test_email = os.getenv('WANTED_TEST_EMAIL', '')
     test_password = os.getenv('WANTED_TEST_PASSWORD', '')
     test_no = test_case.get('NO', '')
-    function_area = test_case.get('기능영역', '')
-    base_url = 'https://www.wanted.co.kr/'
 
     use_saved_session = is_login_precondition(test_case)
     save_session = is_login_action_test(test_case)
 
-    # 로그인 정보 섹션 (로그인 수행 케이스에만 표시)
-    login_info_section = ""
-    if save_session and test_email and test_password:
-        login_info_section = f"""
-## 🔐 테스트 계정 정보
-⚠️ **중요**: 다음 테스트 계정을 사용하세요
-- 이메일: {test_email}
-- 비밀번호: {test_password}
-"""
-
-    # 세션 관련 지시 섹션
+    # 세션 관련 지시
     if use_saved_session:
-        session_instruction = f"""
-## 🔑 로그인 세션 재사용
-⚠️ **중요**: 이 테스트는 사전조건이 '로그인 상태'입니다.
-직접 로그인하지 말고, 저장된 세션 파일을 로드하세요.
-
-브라우저 컨텍스트 생성 시 반드시 아래와 같이 storage_state를 지정하세요:
-```python
-context = await browser.new_context(
-    storage_state='{AUTH_STATE_FILE}',
-    locale='ko-KR',
-    timezone_id='Asia/Seoul'
-)
-```
-"""
+        session_instruction = f"사전조건이 '로그인 상태'이므로 직접 로그인하지 말고 저장된 세션 파일을 로드하세요: storage_state='{AUTH_STATE_FILE}'"
     elif save_session:
-        session_instruction = f"""
-## 💾 로그인 세션 저장
-⚠️ **중요**: 이 테스트는 로그인을 수행합니다.
-로그인 성공 후 반드시 세션을 저장하세요:
-```python
-await context.storage_state(path='{AUTH_STATE_FILE}')
-print("✅ 로그인 세션 저장 완료")
-```
-"""
+        session_instruction = f"로그인 성공 후 반드시 세션을 저장하세요: await context.storage_state(path='{AUTH_STATE_FILE}')"
     else:
         session_instruction = ""
 
-    context_section = load_context()
-    if context_section:
-        context_section = f"\n## 프로젝트 컨텍스트\n{context_section}\n"
+    # 로그인 계정 정보 (로그인 수행 케이스에만)
+    login_info = f"테스트 계정 — 이메일: {test_email} / 비밀번호: {test_password}" if (save_session and test_email) else ""
 
-    prompt = f"""
-당신은 Playwright 테스트 자동화 전문가입니다.
-{context_section}
-## 테스트 정보
-- 테스트 번호: {test_no}
-- URL: {base_url}
+    prompt = f"""## 테스트 케이스 정보
+- 번호: {test_no}
 - 환경: {test_case.get('환경', 'PC')}
-- 기능영역: {function_area}
+- 기능영역: {test_case.get('기능영역', '')}
 - 사전조건: {test_case.get('사전조건', '없음')}
 - 확인사항: {test_case.get('확인사항', '')}
 - 기대결과: {test_case.get('기대결과', '')}
+{f'- {login_info}' if login_info else ''}
+{f'- 세션: {session_instruction}' if session_instruction else ''}
 
-{login_info_section}
-{session_instruction}
-
----
-
-## 작업 지시
-
-### 1단계: 파일 생성
-test/test_{test_no}_working.py 파일을 생성하세요.
-
-### 2단계: 코드 작성
-
-⚠️ **중요**: Playwright는 **비동기(async/await)** 라이브러리입니다!
-
-다음 구조로 **완전히 작동하는** Playwright Python 코드를 작성하세요:
-```python
-from playwright.async_api import async_playwright
-import asyncio
-import sys
-import os
-import pytest
-
-# ⭐ 테스트 계정 정보 (로그인 필요 시)
-TEST_EMAIL = "{test_email}"
-TEST_PASSWORD = "{test_password}"
-
-@pytest.mark.asyncio
-async def test_main():
-    async with async_playwright() as p:
-        # 브라우저 실행
-        browser = await p.chromium.launch(headless=True)
-
-        # 한국어 설정
-        context = await browser.new_context(
-            locale='ko-KR',
-            timezone_id='Asia/Seoul'
-        )
-        page = await context.new_page()
-
-        try:
-            # screenshots 폴더 생성
-            os.makedirs('screenshots', exist_ok=True)
-
-            # 페이지 접속
-            print("🌐 페이지 접속: {base_url}")
-            await page.goto('{base_url}', timeout=30000)
-            await page.wait_for_load_state('networkidle')
-            print("✅ 페이지 로드 완료")
-
-            # ========================================
-            # 여기에 테스트 로직 작성
-            # ========================================
-            # 확인사항: {test_case.get('확인사항', '')}
-            #
-            # ⚠️ 중요: 모든 Playwright 메서드에 await 사용!
-            #
-            # 로케이터 우선순위:
-            # 1. await page.get_by_role('button', name='정확한텍스트').click()
-            # 2. await page.get_by_text('정확한텍스트').click()
-            # 3. await page.locator('css-selector').click()
-
-            # 성공 스크린샷
-            await page.screenshot(path='screenshots/test_{test_no}_success.png')
-            print("✅ 테스트 성공")
-            print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
-            return True
-
-        except Exception as e:
-            # 실패 스크린샷
-            await page.screenshot(path='screenshots/test_{test_no}_failed.png')
-            print(f"❌ 테스트 실패: {{e}}")
-            print(f"AUTOMATION_FAILED: {{e}}")  # ⭐ 실패 시그널
-            return False
-
-        finally:
-            await browser.close()
-
-if __name__ == "__main__":
-    result = asyncio.run(test_main())
-    sys.exit(0 if result else 1)
-```
-
-### 3단계: 필수 체크리스트
-
-✅ **async/await 체크리스트** (반드시 확인!):
-- [ ] `async def main():`로 시작
-- [ ] `async with async_playwright() as p:`
-- [ ] `await p.chromium.launch()`
-- [ ] `await browser.new_context()`
-- [ ] `await context.new_page()`
-- [ ] `await page.goto()`
-- [ ] `await page.wait_for_load_state()`
-- [ ] `await page.click()` 또는 `await element.click()`
-- [ ] `await page.fill()`
-- [ ] `await page.screenshot()`
-- [ ] `await browser.close()`
-- [ ] `asyncio.run(main())`로 실행
-
-### 4단계: 코드 실행
-작성한 코드를 실행하세요: python test/test_{test_no}_working.py
-
-### 5단계: 결과 처리
-- 성공하면 test/test_{test_no}_success.py로 이름 변경
-- 실패하면 에러 분석 후 코드 수정하고 재시도
-
-### 6단계: 최종 출력
-반드시 다음 중 하나를 출력하세요:
-- AUTOMATION_SUCCESS
-- AUTOMATION_FAILED: 에러메시지
-
-⚠️ **다시 한번 강조**: Playwright의 모든 메서드는 **비동기**입니다!
-await를 빠뜨리면 코드가 작동하지 않습니다!
+## 작업
+1. `test/test_{test_no}_working.py` 생성 후 코드 작성
+2. `python test/test_{test_no}_working.py` 실행
+3. 성공 시 `test/test_{test_no}_success.py`로 이름 변경, 실패 시 수정 후 재시도
+4. 마지막에 반드시 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
 
 지금 바로 시작하세요!
 """
 
     return prompt
 
+def load_system_prompt():
+    """system_prompt.txt 로드"""
+    with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+        return f.read()
+
 def run_claude_code(prompt, test_no, max_attempts=3):
     """Claude Code 실행"""
-    
+
+    system_prompt = load_system_prompt()
+
     for attempt in range(1, max_attempts + 1):
         logging.info(f"🤖 Claude Code 실행 시도 {attempt}/{max_attempts}")
-        
+
         try:
             # ⭐ 프롬프트 파일로 저장 (디버깅용)
             prompt_file = f'work/test_{test_no}_prompt.txt'
             with open(prompt_file, 'w', encoding='utf-8') as f:
                 f.write(prompt)
-            
+
             result = subprocess.run(
                 [
                     'claude',
                     '--print',
                     '--model', 'sonnet',
                     '--dangerously-skip-permissions',
+                    '--system-prompt', system_prompt,
                 ],
                 input=prompt,
                 capture_output=True,
@@ -297,6 +155,11 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                     logging.warning(f"⚠️ 파일명 변경 실패: {e}")
             
             if 'AUTOMATION_SUCCESS' in output or os.path.exists(success_file) or os.path.exists(screenshot):
+                # 이전 시도에서 생성된 실패 스크린샷 삭제 (성공 스크린샷으로 대체)
+                failed_screenshot = f'screenshots/test_{test_no}_failed.png'
+                if os.path.exists(failed_screenshot):
+                    os.remove(failed_screenshot)
+                    logging.info(f"🗑️ 실패 스크린샷 삭제: {failed_screenshot}")
                 logging.info(f"✅ 테스트 {test_no} 성공!")
                 return True, output, None
             
@@ -347,30 +210,34 @@ def main():
 
     # 테스트 케이스 로드
     with open('test_cases.json', 'r', encoding='utf-8') as f:
-        test_cases = json.load(f)
+        all_test_cases = json.load(f)
 
     # 특정 케이스만 필터링
     if args.test_no is not None:
-        test_cases = [tc for tc in test_cases if tc.get('NO') == args.test_no]
+        test_cases = [tc for tc in all_test_cases if tc.get('NO') == args.test_no]
         if not test_cases:
             logging.error(f"❌ NO:{args.test_no} 테스트 케이스를 찾을 수 없습니다!")
             return
         logging.info(f"🎯 NO:{args.test_no} 단일 테스트 실행")
     else:
+        test_cases = all_test_cases
         logging.info(f"📋 총 {len(test_cases)}개 테스트")
-    
+
+    # TC #3 (로그인 세션 복원용) 미리 확보
+    login_tc = next((tc for tc in all_test_cases if tc.get('NO') == 3), None)
+
     results = []
-    
+
     for idx, test_case in enumerate(test_cases, 1):
         test_no = test_case.get('NO', idx)
-        
+
         print(f"\n{'='*60}")
         print(f"📝 테스트 {idx}/{len(test_cases)}: TC #{test_no}")
         print("="*60)
-        
+
         prompt = create_claude_prompt(test_case)
         success, output, error = run_claude_code(prompt, test_no, max_attempts=3)
-        
+
         results.append({
             'test_no': test_no,
             'status': 'SUCCESS' if success else 'FAILED',
@@ -378,9 +245,19 @@ def main():
             'error': error,
             'timestamp': datetime.now().isoformat()
         })
-        
+
         print(f"{'✅ 성공!' if success else '❌ 실패!'}")
-        
+
+        # TC #5(로그아웃) 완료 후 TC #3(로그인)으로 세션 복원
+        if test_no == 5 and login_tc is not None:
+            print(f"\n{'='*60}")
+            print(f"🔄 TC #5 로그아웃 완료 → TC #3 재실행으로 세션 복원")
+            print("="*60)
+            time.sleep(2)
+            login_prompt = create_claude_prompt(login_tc)
+            login_success, _, login_error = run_claude_code(login_prompt, 3, max_attempts=3)
+            print(f"{'✅ 세션 복원 성공!' if login_success else '❌ 세션 복원 실패: ' + str(login_error)}")
+
         if idx < len(test_cases):
             time.sleep(2)
     

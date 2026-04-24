@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "awesome-statusline@awesome-claude-plugins": true
+  }
+}

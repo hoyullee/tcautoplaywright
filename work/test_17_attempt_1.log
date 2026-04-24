@@ -1,0 +1,17 @@
+=== 실행 시간 ===
+2026-04-24 16:52:36.578680
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+AUTOMATION_SUCCESS
+
+테스트 17 완료:
+- GNB에서 `a[href="https://www.wanted.co.kr/wdlist"]` 절대 URL 선택자로 채용 링크를 클릭
+- https://www.wanted.co.kr/wdlist (탐색 페이지) 진입 확인
+- `test/test_17_success.py`로 저장 완료
+
+
+=== 에러 ===
+

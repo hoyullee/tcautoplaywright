@@ -1,0 +1,14 @@
+=== 실행 시간 ===
+2026-04-24 17:05:39.009897
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+**AUTOMATION_SUCCESS**
+
+`test/test_20_success.py` 생성 완료. GNB의 교육•이벤트 링크를 클릭 후 `event.wanted.co.kr`로 정상 진입을 확인했습니다. 처음 `expect_page`(새 탭 가정)와 `expect_navigation`이 실패해, `wait_for_url`로 변경하여 해결했습니다.
+
+
+=== 에러 ===
+

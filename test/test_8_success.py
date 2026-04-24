@@ -17,7 +17,7 @@ REAL_UA = (
 async def test_main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, channel='chrome')
-        # 비로그인 상태 - storage_state 없이 새 컨텍스트 생성
+        # 비로그인 상태
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul',
@@ -29,107 +29,28 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 채용 홈 접속
             print("[INFO] 채용 홈 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('load')
             await page.wait_for_timeout(3000)
             print(f"[INFO] 현재 URL: {page.url}")
 
-            # 확인사항 1: '모두가 주목하고 있어요!' 텍스트 확인
-            print("[INFO] '모두가 주목하고 있어요!' 텍스트 탐색 중...")
-            focus_section_text = '모두가 주목하고 있어요!'
-            focus_found = False
-
-            try:
-                el = page.get_by_text(focus_section_text, exact=True)
-                count = await el.count()
-                if count > 0:
-                    await el.first.scroll_into_view_if_needed()
-                    await el.first.wait_for(state='visible', timeout=5000)
-                    focus_found = True
-                    print(f"[OK] '{focus_section_text}' 텍스트 확인됨")
-            except Exception as e:
-                print(f"[WARN] exact match 실패: {e}")
-
-            if not focus_found:
-                try:
-                    el = page.get_by_text(focus_section_text)
-                    count = await el.count()
-                    if count > 0:
-                        await el.first.scroll_into_view_if_needed()
-                        focus_found = True
-                        print(f"[OK] '{focus_section_text}' partial match 확인됨")
-                except Exception as e:
-                    print(f"[WARN] partial match 실패: {e}")
-
-            if not focus_found:
-                result = await page.evaluate("""(text) => {
-                    const walker = document.createTreeWalker(
-                        document.body, NodeFilter.SHOW_TEXT, null, false
-                    );
-                    let node;
-                    while ((node = walker.nextNode())) {
-                        if (node.textContent.includes(text)) {
-                            const el = node.parentElement;
-                            el.scrollIntoView({behavior: 'smooth', block: 'center'});
-                            return {found: true, tag: el.tagName, cls: el.className.substring(0,80)};
-                        }
-                    }
-                    return {found: false};
-                }""", focus_section_text)
-                focus_found = result.get('found', False)
-                print(f"[INFO] JS 탐색 결과: {result}")
-
-            await page.screenshot(path='screenshots/test_7_step1_focus_section.png')
-            assert focus_found, f"'{focus_section_text}' 텍스트를 찾을 수 없습니다"
-            print(f"[OK] '{focus_section_text}' 섹션 존재 확인")
-
-            # '모두가 주목하고 있어요!' 섹션 아래로 스크롤
-            await page.evaluate("""(text) => {
-                const walker = document.createTreeWalker(
-                    document.body, NodeFilter.SHOW_TEXT, null, false
-                );
-                let node;
-                while ((node = walker.nextNode())) {
-                    if (node.textContent.includes(text)) {
-                        node.parentElement.scrollIntoView({behavior: 'smooth', block: 'center'});
-                        break;
-                    }
-                }
-            }""", focus_section_text)
-            await page.wait_for_timeout(1500)
-
-            # 페이지 아래로 스크롤하여 '지금 주목할 소식' 섹션 로드
-            await page.evaluate("window.scrollBy(0, 600)")
-            await page.wait_for_timeout(1500)
-
-            # 확인사항 2: '지금 주목할 소식' 텍스트 확인
-            news_section_text = '지금 주목할 소식'
-            print(f"[INFO] '{news_section_text}' 텍스트 탐색 중...")
+            # ── 1단계: '지금 주목할 소식' 섹션 찾기 ──
+            news_text = '지금 주목할 소식'
+            print(f"[INFO] '{news_text}' 섹션 탐색 중...")
             news_found = False
 
-            try:
-                el = page.get_by_text(news_section_text, exact=True)
-                count = await el.count()
-                if count > 0:
-                    await el.first.scroll_into_view_if_needed()
-                    await el.first.wait_for(state='visible', timeout=5000)
-                    news_found = True
-                    print(f"[OK] '{news_section_text}' 텍스트 확인됨 (exact match)")
-            except Exception as e:
-                print(f"[WARN] exact match 실패: {e}")
-
-            if not news_found:
+            for exact in (True, False):
                 try:
-                    el = page.get_by_text(news_section_text)
-                    count = await el.count()
-                    if count > 0:
+                    el = page.get_by_text(news_text, exact=exact)
+                    if await el.count() > 0:
                         await el.first.scroll_into_view_if_needed()
+                        await el.first.wait_for(state='visible', timeout=5000)
                         news_found = True
-                        print(f"[OK] '{news_section_text}' partial match 확인됨")
+                        print(f"[OK] '{news_text}' 확인됨 (exact={exact})")
+                        break
                 except Exception as e:
-                    print(f"[WARN] partial match 실패: {e}")
+                    print(f"[WARN] get_by_text(exact={exact}) 실패: {e}")
 
             if not news_found:
                 result = await page.evaluate("""(text) => {
@@ -139,21 +60,64 @@ async def test_main():
                     let node;
                     while ((node = walker.nextNode())) {
                         if (node.textContent.includes(text)) {
-                            const el = node.parentElement;
-                            el.scrollIntoView({behavior: 'smooth', block: 'center'});
-                            return {found: true, tag: el.tagName, cls: el.className.substring(0,80)};
+                            node.parentElement.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            return {found: true};
                         }
                     }
                     return {found: false};
-                }""", news_section_text)
+                }""", news_text)
                 news_found = result.get('found', False)
                 print(f"[INFO] JS 탐색 결과: {result}")
 
-            await page.screenshot(path='screenshots/test_7_step2_news_section.png')
-            assert news_found, f"'{news_section_text}' 텍스트를 찾을 수 없습니다"
-            print(f"[OK] '{news_section_text}' 섹션 텍스트 노출 확인")
+            await page.screenshot(path='screenshots/test_8_step1_news_section.png')
+            assert news_found, f"'{news_text}' 텍스트를 찾을 수 없습니다"
+            print(f"[OK] '{news_text}' 섹션 확인됨")
 
-            # '지금 주목할 소식' 섹션으로 스크롤 이동
+            # ── 2단계: '지금 주목할 소식' 아래로 스크롤하며 '테마로 살펴보는 회사/포지션' 찾기 ──
+            theme_text = '테마로 살펴보는 회사/포지션'
+            print(f"[INFO] '{theme_text}' 섹션 탐색 중 (지금 주목할 소식 하단)...")
+
+            # 점진적 스크롤로 lazy-load 트리거
+            for _ in range(6):
+                await page.evaluate("window.scrollBy(0, 500)")
+                await page.wait_for_timeout(800)
+
+            theme_found = False
+
+            for exact in (True, False):
+                try:
+                    el = page.get_by_text(theme_text, exact=exact)
+                    if await el.count() > 0:
+                        await el.first.scroll_into_view_if_needed()
+                        await el.first.wait_for(state='visible', timeout=5000)
+                        theme_found = True
+                        print(f"[OK] '{theme_text}' 확인됨 (exact={exact})")
+                        break
+                except Exception as e:
+                    print(f"[WARN] get_by_text(exact={exact}) 실패: {e}")
+
+            if not theme_found:
+                result = await page.evaluate("""(text) => {
+                    const walker = document.createTreeWalker(
+                        document.body, NodeFilter.SHOW_TEXT, null, false
+                    );
+                    let node;
+                    while ((node = walker.nextNode())) {
+                        if (node.textContent.includes(text)) {
+                            node.parentElement.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            return {found: true, tag: node.parentElement.tagName, cls: node.parentElement.className.substring(0,80)};
+                        }
+                    }
+                    return {found: false};
+                }""", theme_text)
+                theme_found = result.get('found', False)
+                print(f"[INFO] JS 탐색 결과: {result}")
+
+            await page.screenshot(path='screenshots/test_8_step2_theme_section.png')
+            assert theme_found, f"'{theme_text}' 텍스트를 찾을 수 없습니다"
+            print(f"[OK] '{theme_text}' 텍스트 노출 확인")
+
+            # ── 3단계: '테마로 살펴보는 회사/포지션' 섹션으로 스크롤 후 카드 4개 확인 ──
             await page.evaluate("""(text) => {
                 const walker = document.createTreeWalker(
                     document.body, NodeFilter.SHOW_TEXT, null, false
@@ -165,84 +129,75 @@ async def test_main():
                         break;
                     }
                 }
-            }""", news_section_text)
+            }""", theme_text)
             await page.wait_for_timeout(2000)
 
-            # 기대결과: 컨텐츠 카드 3개 확인
-            print("[INFO] '지금 주목할 소식' 섹션 내 컨텐츠 카드 탐색 중...")
-
+            print("[INFO] '테마로 살펴보는 회사/포지션' 섹션 내 컨텐츠 카드 탐색 중...")
             card_count_result = await page.evaluate("""(sectionText) => {
-                // 텍스트가 포함된 섹션 요소 찾기
+                // 섹션 요소 찾기
                 let sectionEl = null;
                 const allEls = Array.from(document.querySelectorAll('h2, h3, h4, p, span, div'));
                 for (const el of allEls) {
                     if (el.textContent.trim() === sectionText && el.children.length === 0) {
-                        sectionEl = el;
-                        break;
+                        sectionEl = el; break;
                     }
                 }
                 if (!sectionEl) {
-                    // partial match fallback
                     for (const el of allEls) {
                         if (el.textContent.trim().includes(sectionText) && el.children.length === 0) {
-                            sectionEl = el;
-                            break;
+                            sectionEl = el; break;
                         }
                     }
                 }
+                if (!sectionEl) return {found: false, count: 0, debug: 'section not found'};
 
-                if (!sectionEl) {
-                    return {found: false, count: 0, debug: 'section element not found'};
-                }
-
-                // 섹션 부모 컨테이너에서 카드 탐색 (최대 6단계 위)
+                // 부모 컨테이너에서 카드 탐색 (최대 8단계)
                 let container = sectionEl.parentElement;
-                for (let i = 0; i < 6; i++) {
+                for (let i = 0; i < 8; i++) {
                     if (!container) break;
                     const cards = container.querySelectorAll(
-                        'li, [class*="Card"], [class*="card"], [class*="Article"], [class*="article"], [class*="Content"], [class*="content"]'
+                        'li, [class*="Card"], [class*="card"], [class*="Theme"], [class*="theme"], [class*="Company"], [class*="company"]'
                     );
-                    if (cards.length >= 3) {
+                    if (cards.length >= 4) {
                         return {found: true, count: cards.length, tag: container.tagName, cls: container.className.substring(0,80), depth: i};
                     }
                     container = container.parentElement;
                 }
 
-                // 섹션 다음 형제 요소에서 카드 탐색
+                // 형제 요소에서 탐색
                 let sibling = sectionEl.parentElement?.nextElementSibling;
                 for (let i = 0; i < 5; i++) {
                     if (!sibling) break;
                     const cards = sibling.querySelectorAll(
-                        'li, [class*="Card"], [class*="card"], [class*="Article"], [class*="article"]'
+                        'li, [class*="Card"], [class*="card"], [class*="Theme"], [class*="theme"]'
                     );
-                    if (cards.length >= 3) {
+                    if (cards.length >= 4) {
                         return {found: true, count: cards.length, tag: sibling.tagName, cls: sibling.className.substring(0,80), source: 'sibling'};
                     }
                     sibling = sibling.nextElementSibling;
                 }
-
                 return {found: false, count: 0, sectionTag: sectionEl.tagName, sectionCls: sectionEl.className.substring(0,80)};
-            }""", news_section_text)
+            }""", theme_text)
 
             print(f"[INFO] 카드 탐색 결과: {card_count_result}")
             card_count = card_count_result.get('count', 0)
 
-            # 전체 페이지에서 컨텐츠 카드 탐색 (fallback)
-            if card_count < 3:
+            # fallback: 전체 페이지에서 탐색
+            if card_count < 4:
                 print("[INFO] 전체 페이지에서 컨텐츠 카드 재탐색...")
                 fallback_result = await page.evaluate("""() => {
-                    const cardSelectors = [
-                        '[class*="ArticleCard"]', '[class*="article-card"]',
+                    const selectors = [
+                        '[class*="ThemeCard"]', '[class*="theme-card"]',
+                        '[class*="CompanyCard"]', '[class*="company-card"]',
                         '[class*="ContentCard"]', '[class*="content-card"]',
-                        '[class*="NewsCard"]', '[class*="news-card"]',
-                        '[class*="EventCard"]', '[class*="event-card"]',
+                        '[class*="ArticleCard"]', '[class*="article-card"]',
                         'ul[class*="List"] > li', 'ul[class*="list"] > li',
-                        '[class*="Card"]:not([class*="Job"]):not([class*="job"])',
+                        '[class*="Card"]:not([class*="Job"]):not([class*="job"]):not([class*="Profile"]):not([class*="profile"])',
                     ];
-                    for (const sel of cardSelectors) {
+                    for (const sel of selectors) {
                         try {
                             const cards = document.querySelectorAll(sel);
-                            if (cards.length >= 3) {
+                            if (cards.length >= 4) {
                                 return {selector: sel, count: cards.length};
                             }
                         } catch(e) {}
@@ -252,12 +207,12 @@ async def test_main():
                 print(f"[INFO] 전체 페이지 카드 탐색 결과: {fallback_result}")
                 card_count = max(card_count, fallback_result.get('count', 0))
 
-            await page.screenshot(path='screenshots/test_7_step3_cards.png')
-            assert card_count >= 3, f"컨텐츠 카드 3개 미만 확인됨: {card_count}개"
-            print(f"[OK] 컨텐츠 카드 {card_count}개 확인됨 (3개 이상)")
+            await page.screenshot(path='screenshots/test_8_step3_cards.png')
+            assert card_count >= 4, f"컨텐츠 카드 4개 미만 확인됨: {card_count}개"
+            print(f"[OK] 컨텐츠 카드 {card_count}개 확인됨 (4개 이상)")
 
-            # 기대결과: 우측 버튼 클릭 후 추가 컨텐츠 카드 노출 확인
-            print("[INFO] '지금 주목할 소식' 섹션 우측 스크롤 버튼 탐색 중...")
+            # ── 4단계: 우측 버튼 클릭 후 추가 카드 노출 확인 ──
+            print("[INFO] 우측 스크롤 버튼 탐색 중...")
             right_btn_clicked = False
 
             right_btn_selectors = [
@@ -276,7 +231,6 @@ async def test_main():
                 '[class*="SlideBtn"]:last-child',
                 '[class*="slideBtn"]:last-child',
                 '[class*="NavBtn"]:last-child',
-                '[class*="Btn"]:last-child',
             ]
 
             for sel in right_btn_selectors:
@@ -299,7 +253,7 @@ async def test_main():
                 except Exception:
                     continue
 
-            # JS로 우측 버튼 탐색 (fallback)
+            # JS fallback
             if not right_btn_clicked:
                 print("[INFO] JS로 우측 버튼 탐색...")
                 js_result = await page.evaluate("""() => {
@@ -326,40 +280,37 @@ async def test_main():
                     print(f"[OK] JS로 우측 버튼 클릭됨: {js_result}")
 
             await page.wait_for_timeout(2000)
-            await page.screenshot(path='screenshots/test_7_step4_after_scroll.png')
+            await page.screenshot(path='screenshots/test_8_step4_after_scroll.png')
 
             if right_btn_clicked:
-                print("[INFO] 스크롤 후 추가 컨텐츠 카드 확인 중...")
-                after_scroll_result = await page.evaluate("""() => {
-                    const cardSelectors = [
-                        '[class*="ArticleCard"]', '[class*="article-card"]',
+                after_result = await page.evaluate("""() => {
+                    const selectors = [
+                        '[class*="ThemeCard"]', '[class*="theme-card"]',
                         '[class*="ContentCard"]', '[class*="content-card"]',
                         '[class*="Card"]:not([class*="Job"]):not([class*="job"])',
                         'ul[class*="List"] > li',
                     ];
-                    for (const sel of cardSelectors) {
+                    for (const sel of selectors) {
                         try {
                             const cards = document.querySelectorAll(sel);
-                            if (cards.length >= 3) {
-                                return {selector: sel, count: cards.length};
-                            }
+                            if (cards.length >= 4) return {selector: sel, count: cards.length};
                         } catch(e) {}
                     }
                     return {selector: null, count: 0};
                 }""")
-                print(f"[INFO] 스크롤 후 카드 수: {after_scroll_result}")
+                print(f"[INFO] 스크롤 후 카드 수: {after_result}")
                 print("[OK] 우측 버튼 클릭 후 추가 컨텐츠 카드 노출 확인됨")
             else:
                 print("[WARN] 우측 버튼을 찾지 못했습니다. 스크롤 동작 검증 건너뜀")
 
-            await page.screenshot(path='screenshots/test_7_success.png')
+            await page.screenshot(path='screenshots/test_8_success.png')
             print("[OK] 테스트 성공")
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
             try:
-                await page.screenshot(path='screenshots/test_7_failed.png')
+                await page.screenshot(path='screenshots/test_8_failed.png')
             except Exception:
                 pass
             print(f"[FAIL] 테스트 실패: {e}")

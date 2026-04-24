@@ -1,0 +1,178 @@
+
+당신은 Playwright 테스트 자동화 전문가입니다.
+
+## 프로젝트 컨텍스트
+# 프로젝트 컨텍스트 및 용어 정의
+
+## 페이지 URL 매핑
+| 용어 | URL |
+|------|-----|
+| 채용 홈 | https://www.wanted.co.kr/ |
+| 탐색 페이지 | https://www.wanted.co.kr/wdlist |
+| 이력서 페이지 (비로그인) | https://www.wanted.co.kr/cv/intro |
+| 이력서 페이지 (로그인) | https://www.wanted.co.kr/cv/list |
+| 교육 이벤트 | https://event.wanted.co.kr/ |
+| 콘텐츠 | https://www.wanted.co.kr/events |
+| 소셜 | https://social.wanted.co.kr/community |
+| 프리랜서 | https://www.wanted.co.kr/gigs/experts |
+| 포지션 상세 페이지 | https://www.wanted.co.kr/wd/{포지션ID} |
+
+## 용어 설명
+- **채용 홈**: 원티드 메인 채용 페이지 (https://www.wanted.co.kr/)
+- **탐색 페이지**: GNB의 채용 탭을 클릭하면 진입하는 페이지 (https://www.wanted.co.kr/wdlist)
+- **이력서 페이지**: GNB의 이력서 탭을 클릭하면 진입하는 페이지
+  - 비로그인: https://www.wanted.co.kr/cv/intro
+  - 로그인: https://www.wanted.co.kr/cv/list
+- **교육이벤트**: GNB의 교육•이벤트 탭을 클릭하면 진입하는 페이지 (https://event.wanted.co.kr/)
+- **콘텐츠**: GNB의 콘텐츠 탭을 클릭하면 진입하는 페이지 (https://www.wanted.co.kr/events)
+- **소셜**: GNB의 소셜 탭을 클릭하면 진입하는 페이지 (https://social.wanted.co.kr/community)
+- **프리랜서**: GNB의 프리랜서 탭을 클릭하면 새 페이지에서 진입되는 페이지 (https://www.wanted.co.kr/gigs/experts)
+- **포지션 상세 페이지**: 탐색 페이지에서 포지션 카드를 선택하면 진입되는 페이지
+  - URL 패턴: `https://www.wanted.co.kr/wd/{포지션ID}` ({포지션ID}는 포지션 카드별로 고유하게 부여된 숫자)
+- **GNB**: Global Navigation Bar, 페이지 상단 글로벌 네비게이션 바
+- **LNB**: Local Navigation Bar, 페이지 좌측 또는 서브 네비게이션 바
+
+
+## 테스트 정보
+- 테스트 번호: 9
+- URL: https://www.wanted.co.kr/
+- 환경: PC
+- 기능영역: 채용 홈
+- 사전조건: 1. 비로그인 상태
+2. 채용 탭 진입 상태
+- 확인사항: 1. '테마로 살펴보는 회사/포지션' 항목 하단
+2. '출퇴근 걱정없는 역세권 포지션' 항목 확인
+- 기대결과: '테마로 살펴보는 회사/포지션' 텍스트 노출되며 아래 항목 추가 노출
+
+- '테마로 살펴보는 회사/포지션' 텍스트 우측 버튼
+- 포지션 카드 9개
+- 우측 버튼 선택 시 우측으로 스크롤되며 추가 포지션 카드 노출
+
+
+
+## 🔑 로그인 세션 재사용
+⚠️ **중요**: 이 테스트는 사전조건이 '로그인 상태'입니다.
+직접 로그인하지 말고, 저장된 세션 파일을 로드하세요.
+
+브라우저 컨텍스트 생성 시 반드시 아래와 같이 storage_state를 지정하세요:
+```python
+context = await browser.new_context(
+    storage_state='work/auth_state.json',
+    locale='ko-KR',
+    timezone_id='Asia/Seoul'
+)
+```
+
+
+---
+
+## 작업 지시
+
+### 1단계: 파일 생성
+test/test_9_working.py 파일을 생성하세요.
+
+### 2단계: 코드 작성
+
+⚠️ **중요**: Playwright는 **비동기(async/await)** 라이브러리입니다!
+
+다음 구조로 **완전히 작동하는** Playwright Python 코드를 작성하세요:
+```python
+from playwright.async_api import async_playwright
+import asyncio
+import sys
+import os
+import pytest
+
+# ⭐ 테스트 계정 정보 (로그인 필요 시)
+TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
+TEST_PASSWORD = "wanted12!@"
+
+@pytest.mark.asyncio
+async def test_main():
+    async with async_playwright() as p:
+        # 브라우저 실행
+        browser = await p.chromium.launch(headless=True)
+
+        # 한국어 설정
+        context = await browser.new_context(
+            locale='ko-KR',
+            timezone_id='Asia/Seoul'
+        )
+        page = await context.new_page()
+
+        try:
+            # screenshots 폴더 생성
+            os.makedirs('screenshots', exist_ok=True)
+
+            # 페이지 접속
+            print("🌐 페이지 접속: https://www.wanted.co.kr/")
+            await page.goto('https://www.wanted.co.kr/', timeout=30000)
+            await page.wait_for_load_state('networkidle')
+            print("✅ 페이지 로드 완료")
+
+            # ========================================
+            # 여기에 테스트 로직 작성
+            # ========================================
+            # 확인사항: 1. '테마로 살펴보는 회사/포지션' 항목 하단
+2. '출퇴근 걱정없는 역세권 포지션' 항목 확인
+            #
+            # ⚠️ 중요: 모든 Playwright 메서드에 await 사용!
+            #
+            # 로케이터 우선순위:
+            # 1. await page.get_by_role('button', name='정확한텍스트').click()
+            # 2. await page.get_by_text('정확한텍스트').click()
+            # 3. await page.locator('css-selector').click()
+
+            # 성공 스크린샷
+            await page.screenshot(path='screenshots/test_9_success.png')
+            print("✅ 테스트 성공")
+            print("AUTOMATION_SUCCESS")  # ⭐ 성공 시그널
+            return True
+
+        except Exception as e:
+            # 실패 스크린샷
+            await page.screenshot(path='screenshots/test_9_failed.png')
+            print(f"❌ 테스트 실패: {e}")
+            print(f"AUTOMATION_FAILED: {e}")  # ⭐ 실패 시그널
+            return False
+
+        finally:
+            await browser.close()
+
+if __name__ == "__main__":
+    result = asyncio.run(test_main())
+    sys.exit(0 if result else 1)
+```
+
+### 3단계: 필수 체크리스트
+
+✅ **async/await 체크리스트** (반드시 확인!):
+- [ ] `async def main():`로 시작
+- [ ] `async with async_playwright() as p:`
+- [ ] `await p.chromium.launch()`
+- [ ] `await browser.new_context()`
+- [ ] `await context.new_page()`
+- [ ] `await page.goto()`
+- [ ] `await page.wait_for_load_state()`
+- [ ] `await page.click()` 또는 `await element.click()`
+- [ ] `await page.fill()`
+- [ ] `await page.screenshot()`
+- [ ] `await browser.close()`
+- [ ] `asyncio.run(main())`로 실행
+
+### 4단계: 코드 실행
+작성한 코드를 실행하세요: python test/test_9_working.py
+
+### 5단계: 결과 처리
+- 성공하면 test/test_9_success.py로 이름 변경
+- 실패하면 에러 분석 후 코드 수정하고 재시도
+
+### 6단계: 최종 출력
+반드시 다음 중 하나를 출력하세요:
+- AUTOMATION_SUCCESS
+- AUTOMATION_FAILED: 에러메시지
+
+⚠️ **다시 한번 강조**: Playwright의 모든 메서드는 **비동기**입니다!
+await를 빠뜨리면 코드가 작동하지 않습니다!
+
+지금 바로 시작하세요!

@@ -1,7 +1,4 @@
 import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
 from playwright.async_api import async_playwright
 import asyncio
 import os
