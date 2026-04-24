@@ -1,0 +1,29 @@
+=== 실행 시간 ===
+2026-04-25 01:00:23.506347
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+✅ **AUTOMATION_SUCCESS**
+
+## 테스트 결과 요약
+
+**테스트 26 - GNB > 소셜: 로그인 해주세요 버튼 → 회원가입/로그인 페이지 진입**
+
+| 단계 | 결과 |
+|------|------|
+| 소셜 탭 접속 (`https://social.wanted.co.kr/community`) | ✅ 성공 |
+| LNB 영역 **'로그인 해주세요.'** 버튼 탐색 | ✅ 발견 |
+| 버튼 클릭 후 로그인 페이지 진입 확인 | ✅ `https://id.wanted.co.kr/login?...` |
+| 이메일/비밀번호 입력 및 로그인 | ✅ 성공 |
+| 세션 저장 (`work/auth_state.json`) | ✅ 완료 |
+
+- **소셜 URL**: `https://social.wanted.co.kr/community` (GNB 소셜 탭 진입)
+- **LNB 버튼**: `로그인 해주세요.` 버튼 정상 확인
+- **로그인 페이지**: `https://id.wanted.co.kr/login` 정상 진입
+- **파일**: `test/test_26_success.py`로 저장 완료
+
+
+=== 에러 ===
+

@@ -1,0 +1,30 @@
+=== 실행 시간 ===
+2026-04-25 01:01:57.020201
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+✅ **AUTOMATION_SUCCESS**
+
+## 테스트 27 실행 결과
+
+**성공적으로 완료되었습니다!**
+
+### 실행 흐름
+
+1. **소셜 탭 진입** → `https://social.wanted.co.kr/community` 로드
+2. **로그인 버튼 발견** → LNB 영역의 `'로그인 해주세요.'` 버튼 클릭
+3. **로그인 페이지 이동** → `https://id.wanted.co.kr/login?service=wanted&before_url=https%3A%2F%2Fsocial.wanted.co.kr%2Fcommunity&...`
+4. **'이메일로 계속하기' 클릭** → 이메일/비밀번호 입력 폼 표시
+5. **이메일 입력** → `hoyul.lee+1@wantedlab.com`
+6. **비밀번호 입력** → `wanted12!@`
+7. **로그인 버튼 클릭** → 로그인 처리
+8. **소셜 탭 리다이렉트 확인** → `https://social.wanted.co.kr/community` ✅
+9. **세션 저장** → `work/auth_state.json` ✅
+
+**파일**: `test/test_27_working.py` → `test/test_27_success.py` 으로 이름 변경 완료
+
+
+=== 에러 ===
+

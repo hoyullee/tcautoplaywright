@@ -1,0 +1,19 @@
+## 테스트 케이스 정보
+- 번호: 28
+- 환경: PC
+- 기능영역: GNB > 채용
+- 사전조건: 1. 비로그인 상태
+2. 탐색 페이지 진입 상태
+- 확인사항: 1. 리스트 영역 상단
+2. '적극 채용 중인 회사' 항목 노출 여부 확인
+- 기대결과: 적극 채용 중인 회사' 비노출
+
+- 세션: 사전조건이 '로그인 상태'이므로 직접 로그인하지 말고 저장된 세션 파일을 로드하세요: storage_state='work/auth_state.json'
+
+## 작업
+1. `test/test_28_working.py` 생성 후 코드 작성
+2. `python test/test_28_working.py` 실행
+3. 성공 시 `test/test_28_success.py`로 이름 변경, 실패 시 수정 후 재시도
+4. 마지막에 반드시 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
+
+지금 바로 시작하세요!
