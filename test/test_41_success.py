@@ -1,11 +1,8 @@
 import sys
-import io
 from playwright.async_api import async_playwright
 import asyncio
 import os
 
-# Windows 콘솔 UTF-8 인코딩 설정
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 REAL_UA = (
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '

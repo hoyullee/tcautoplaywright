@@ -11,47 +11,44 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 체크아웃
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
-      
+
       - name: Python 3.11 설정
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
+
       - name: 의존성 설치
         run: |
-          pip install playwright requests python-dotenv
-          playwright install chromium
-      
+          pip install playwright pytest pytest-asyncio anyio python-dotenv
+          playwright install --with-deps chromium
+
+      - name: 실행 디렉토리 준비
+        run: mkdir -p work screenshots test_results logs
+
       - name: 테스트 실행
+        env:
+          WANTED_TEST_EMAIL: ${{ secrets.WANTED_TEST_EMAIL }}
+          WANTED_TEST_PASSWORD: ${{ secrets.WANTED_TEST_PASSWORD }}
         run: |
-          export LAAS_API_KEY="${{ secrets.LAAS_API_KEY }}"
-          export PROJECT_CODE="${{ secrets.PROJECT_CODE }}"
-          export PRESET_HASH="${{ secrets.PRESET_HASH }}"
-          export TEST_CASES='${{ toJson(github.event.client_payload.test_cases) }}'
-          
+          pytest test/ -v --tb=short 2>&1 | tee logs/pytest_output.log || true
+
+      - name: 테스트 결과 요약
+        if: always()
+        run: |
           echo "======================================"
-          echo "🔍 테스트 실행 전 환경변수 확인"
+          echo "📊 테스트 결과 요약"
           echo "======================================"
-          echo "LAAS_API_KEY 존재: $([[ -n "$LAAS_API_KEY" ]] && echo 'Yes' || echo 'No')"
-          echo "LAAS_API_KEY 길이: ${#LAAS_API_KEY}"
-          echo "PROJECT_CODE: $PROJECT_CODE"
-          echo "PRESET_HASH 존재: $([[ -n "$PRESET_HASH" ]] && echo 'Yes' || echo 'No')"
-          echo "PRESET_HASH 길이: ${#PRESET_HASH}"
-          echo "======================================"
-          echo ""
-          
-          python main_github.py
-      
-      # 테스트 결과 업로드
+          grep -E "PASSED|FAILED|ERROR|passed|failed|error" logs/pytest_output.log | tail -20 || true
+
       - name: 테스트 결과 업로드 (Artifacts)
-        if: always()  # 성공/실패 여부와 관계없이 항상 실행
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ github.run_number }}
@@ -60,5 +57,5 @@ jobs:
             test_results/
             screenshots/
             logs/
-          retention-days: 30  # 30일 보관
-          if-no-files-found: warn  # 파일이 없으면 경고만
+          retention-days: 30
+          if-no-files-found: warn
