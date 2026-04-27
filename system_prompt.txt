@@ -59,12 +59,12 @@ async def test_main():
 
             # 테스트 로직
 
-            await page.screenshot(path='screenshots/test_{NO}_success.png')
+            await page.screenshot(path='screenshots/test_{NO}_success.png  # {NO}는 두 자리 숫자 (예: 01, 02, 10)')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_{NO}_failed.png')
+            await page.screenshot(path='screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)')
             print(f"AUTOMATION_FAILED: {e}")
             return False
 
@@ -83,8 +83,8 @@ if __name__ == "__main__":
 
 ### 스크린샷 규칙 (반드시 준수)
 - **TC당 스크린샷은 1장만** 허용
-- 성공 시: `screenshots/test_{NO}_success.png` 1장만 저장
-- 실패 시: `screenshots/test_{NO}_failed.png` 1장만 저장
+- 성공 시: `screenshots/test_{NO}_success.png  # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
+- 실패 시: `screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
 - 중간 단계(페이지 로드, 버튼 클릭 등) 스크린샷 절대 금지
 - `page.screenshot()`은 try 블록 마지막(성공 확정 후)과 except 블록(실패 확정 후) 각각 1회씩만 호출
 

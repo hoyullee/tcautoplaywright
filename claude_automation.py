@@ -55,6 +55,7 @@ def create_claude_prompt(test_case):
     test_email = os.getenv('WANTED_TEST_EMAIL', '')
     test_password = os.getenv('WANTED_TEST_PASSWORD', '')
     test_no = test_case.get('NO', '')
+    test_no_str = str(test_no).zfill(2)  # 01, 02 ... 10, 11 형식
 
     use_saved_session = is_login_precondition(test_case)
     save_session = is_login_action_test(test_case)
@@ -81,9 +82,9 @@ def create_claude_prompt(test_case):
 {f'- 세션: {session_instruction}' if session_instruction else ''}
 
 ## 작업
-1. `test/test_{test_no}_working.py` 생성 후 코드 작성
-2. `python test/test_{test_no}_working.py` 실행
-3. 성공 시 `test/test_{test_no}_success.py`로 이름 변경, 실패 시 수정 후 재시도
+1. `test/test_{test_no_str}_working.py` 생성 후 코드 작성
+2. `python test/test_{test_no_str}_working.py` 실행
+3. 성공 시 `test/test_{test_no_str}_success.py`로 이름 변경, 실패 시 수정 후 재시도
 4. 마지막에 반드시 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
 
 지금 바로 시작하세요!
@@ -100,13 +101,14 @@ def run_claude_code(prompt, test_no, max_attempts=3):
     """Claude Code 실행"""
 
     system_prompt = load_system_prompt()
+    test_no_str = str(test_no).zfill(2)
 
     for attempt in range(1, max_attempts + 1):
         logging.info(f"🤖 Claude Code 실행 시도 {attempt}/{max_attempts}")
 
         try:
             # ⭐ 프롬프트 파일로 저장 (디버깅용)
-            prompt_file = f'work/test_{test_no}_prompt.txt'
+            prompt_file = f'work/test_{test_no_str}_prompt.txt'
             with open(prompt_file, 'w', encoding='utf-8') as f:
                 f.write(prompt)
 
@@ -132,42 +134,41 @@ def run_claude_code(prompt, test_no, max_attempts=3):
             error = result.stderr
             
             # 로그 저장
-            log_file = f'work/test_{test_no}_attempt_{attempt}.log'
+            log_file = f'work/test_{test_no_str}_attempt_{attempt}.log'
             with open(log_file, 'w', encoding='utf-8') as f:
                 f.write(f"=== 실행 시간 ===\n{datetime.now()}\n\n")
                 f.write(f"=== 종료 코드 ===\n{result.returncode}\n\n")
                 f.write(f"=== 출력 ===\n{output}\n\n")
                 f.write(f"=== 에러 ===\n{error}\n")
-            
+
             logging.info(f"📄 로그: {log_file}")
-            
+
             if result.returncode != 0:
                 logging.warning(f"⚠️ 종료 코드: {result.returncode}")
-            
+
             # 성공 확인
-            success_file = f'test/test_{test_no}_success.py'
-            working_file = f'test/test_{test_no}_working.py'  # ⭐ 추가
-            screenshot = f'screenshots/test_{test_no}_success.png'
-            
-            # ⭐ working 파일 확인 및 처리
+            success_file = f'test/test_{test_no_str}_success.py'
+            working_file = f'test/test_{test_no_str}_working.py'
+            screenshot = f'screenshots/test_{test_no_str}_success.png'
+
+            # working 파일 확인 및 처리
             if os.path.exists(working_file):
                 logging.info(f"📝 작업 파일 발견: {working_file}")
-                # 성공 파일로 이름 변경
                 try:
                     shutil.move(working_file, success_file)
                     logging.info(f"✅ 파일명 변경: {success_file}")
                 except Exception as e:
                     logging.warning(f"⚠️ 파일명 변경 실패: {e}")
-            
+
             if 'AUTOMATION_SUCCESS' in output or os.path.exists(success_file) or os.path.exists(screenshot):
                 # 이전 시도에서 생성된 실패 스크린샷 삭제 (성공 스크린샷으로 대체)
-                failed_screenshot = f'screenshots/test_{test_no}_failed.png'
+                failed_screenshot = f'screenshots/test_{test_no_str}_failed.png'
                 if os.path.exists(failed_screenshot):
                     os.remove(failed_screenshot)
                     logging.info(f"🗑️ 실패 스크린샷 삭제: {failed_screenshot}")
                 logging.info(f"✅ 테스트 {test_no} 성공!")
                 return True, output, None
-            
+
             elif 'AUTOMATION_FAILED:' in output:
                 error_msg = output.split('AUTOMATION_FAILED:')[1].split('\n')[0].strip()
                 logging.warning(f"❌ 테스트 {test_no} 실패: {error_msg}")

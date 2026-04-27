@@ -287,26 +287,33 @@ exportJson.gs에서 forceAuthorize 함수 실행하여 권한 승인 실행 후 
 sheets-automation/
 ├── venv/                       # Python 가상환경
 ├── test/                       # 생성된 Playwright 테스트 코드
-│   ├── test_1_success.py
-│   ├── test_2_success.py
+│   ├── test_01_success.py
+│   ├── test_02_success.py
 │   └── ...
-├── generated_codes/            # 성공/실패 코드 백업
-│   ├── test_1_success.py
-│   └── test_1_failed.py
 ├── test_results/               # 실행 결과 JSON
-│   └── result_20240121_143022.json
+│   └── result_20260424_172603.json
 ├── screenshots/                # 테스트 스크린샷
 │   ├── test_1_success.png
 │   └── test_1_failed.png
 ├── logs/                       # 실행 로그
-│   └── test_20240121_143022.log
+│   └── test_20260424_172603.log
+├── work/                       # 임시 작업 파일 (프롬프트, 시도 로그 등)
+│   ├── auth_state.json
+│   ├── test_N_prompt.txt
+│   └── test_N_attempt_M.log
+├── .github/
+│   └── workflows/
+│       └── run-tests.yml       # GitHub Actions 워크플로우
+├── claude_automation.py        # Claude API 기반 테스트 자동 생성
 ├── run_automation.py           # 전체 자동화 메인 스크립트
 ├── download_tc.py              # Google Drive TC 다운로드
-├── main_github.py              # GitHub Actions용 메인 스크립트
-├── convert_to_pytest.py        # pytest 형식 변환 스크립트
-├── test_cases.json             # 다운로드된 TC (임시)
+├── check_page.py               # 페이지 상태 확인 유틸리티
+├── context.md                  # 테스트 대상 앱 컨텍스트
+├── system_prompt.txt           # Claude 시스템 프롬프트
+├── test_cases.json             # 다운로드된 TC
 ├── pytest.ini                  # pytest 설정
 ├── requirements.txt            # Python 의존성
+├── package.json                # Node.js 의존성 (Playwright)
 └── README.md
 ```
 

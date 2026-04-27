@@ -2,9 +2,6 @@ venv/
 __pycache__/
 *.pyc
 
-# 생성된 테스트 코드 제외
-generated_codes/
-
 # 스크린샷 제외
 screenshots/
 
