@@ -1,0 +1,27 @@
+=== 실행 시간 ===
+2026-04-28 17:31:49.476425
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+**AUTOMATION_SUCCESS**
+
+## 테스트 결과 요약
+
+✅ **테스트 케이스 48 성공**
+
+### 실행 흐름:
+1. **검색 결과 페이지 진입**: `https://www.wanted.co.kr/search?query=개발자&tab=profile` 로 직접 이동
+2. **프로필 탭 클릭**: `[role="tab"]:has-text("프로필")` 선택자로 탭 활성화 확인
+3. **프로필 항목 확인**: `social.wanted.co.kr/community/profile/` 패턴의 링크 **21개** 발견 (가시적 12개)
+4. **프로필 선택**: 첫 번째 가시적 프로필 클릭
+5. **상세 페이지 이동 확인**: `https://social.wanted.co.kr/community/profile/e2MCjmsmgfsXkJwPGRjefi?pageType=profile` 로 정상 이동
+
+### 검증 완료:
+- ✅ 프로필 항목 노출 (12개)
+- ✅ 임의의 프로필 선택 → `social.wanted.co.kr/community/profile/{id}` 형식의 상세 페이지로 이동
+
+
+=== 에러 ===
+

@@ -1,0 +1,27 @@
+=== 실행 시간 ===
+2026-04-28 17:26:33.827484
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+✅ **AUTOMATION_SUCCESS**
+
+## 테스트 46 완료 요약
+
+**테스트 파일**: `test/test_46_success.py`
+
+**테스트 흐름**:
+1. 비로그인 상태로 검색 결과 페이지 진입 (`?query=개발자&tab=content`)
+2. **콘텐츠 탭** 클릭 확인 → `[role="tab"]:has-text("콘텐츠")` 선택자로 성공
+3. `/events/` 패턴 링크 탐색 → `https://www.wanted.co.kr/events/2025devreport` 발견
+4. JS navigate로 콘텐츠 상세 페이지 이동
+5. URL 패턴 `wanted.co.kr/events/{id}` 검증 ✅
+
+**결과**:
+- 검색 결과에서 콘텐츠 항목 노출 확인
+- 콘텐츠 선택 → `https://www.wanted.co.kr/events/2025devreport` 상세 페이지 이동 성공
+
+
+=== 에러 ===
+

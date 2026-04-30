@@ -1,0 +1,36 @@
+=== 실행 시간 ===
+2026-04-30 10:39:56.502939
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+테스트 케이스 50이 성공적으로 완료되었습니다!
+
+## 결과 요약
+
+**TC 50 - GNB > 검색 > 최근 검색어 노출**
+
+### 실행 결과: `AUTOMATION_SUCCESS` ✅
+
+### 테스트 수행 단계:
+1. **채용 홈 진입** - `https://www.wanted.co.kr/` 로드 ✅
+2. **검색 버튼 클릭** - GNB 검색 버튼 (x=973, y=30) 클릭 ✅
+3. **검색어 입력** - '개발자' 입력 후 Enter ✅
+4. **검색 결과 확인** - `https://www.wanted.co.kr/search?query=%EA%B0%9C%EB%B0%9C%EC%9E%90` 이동 ✅
+5. **채용 홈 복귀** - `https://www.wanted.co.kr/` 재진입 ✅
+6. **검색 화면 재진입** - 검색 버튼 재클릭 ✅
+7. **최근 검색어 노출 확인** - '개발자' 페이지 노출 확인 (`developerFound: True`) ✅
+
+### 주요 검증 항목:
+- `developerFound: True` - 검색한 '개발자' 키워드가 페이지에 노출됨
+- 검색 영역 LI 항목 확인
+- localStorage/sessionStorage 검색 이력 확인
+
+### 파일:
+- `test/test_50_success.py` 생성 완료
+- `screenshots/test_50_success.png` 저장 완료
+
+
+=== 에러 ===
+

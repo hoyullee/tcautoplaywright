@@ -1,0 +1,30 @@
+=== 실행 시간 ===
+2026-04-28 17:29:19.731684
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+✅ **AUTOMATION_SUCCESS**
+
+## 테스트 케이스 47 완료
+
+**실행 결과 요약:**
+
+| 단계 | 결과 |
+|------|------|
+| 검색 결과 페이지 진입 (`/search?query=개발자&tab=social`) | ✅ |
+| 소셜 탭 클릭 (`[role="tab"]:has-text("소셜")`) | ✅ |
+| 소셜 항목 노출 확인 | ✅ 8개 발견 |
+| 임의의 소셜(post) 클릭 | ✅ `post/546` 선택 |
+| 소셜 상세 페이지 이동 확인 | ✅ `https://social.wanted.co.kr/community/post/546` |
+
+**핵심 로직:**
+- `social.wanted.co.kr/community/(post|article)/` 패턴으로 소셜 링크 탐색
+- 소셜 링크가 없을 경우 다양한 검색어/탭 조합으로 재시도
+- 새 탭으로 열리는 경우와 같은 탭에서 열리는 경우 모두 처리
+- 최종 URL이 `social.wanted.co.kr/community/post/{id}` 또는 `article/{id}` 패턴인지 검증
+
+
+=== 에러 ===
+

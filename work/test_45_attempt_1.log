@@ -1,0 +1,30 @@
+=== 실행 시간 ===
+2026-04-28 17:24:42.137368
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+**AUTOMATION_SUCCESS** ✅
+
+## 테스트 45 실행 결과
+
+| 항목 | 결과 |
+|------|------|
+| 파일 | `test/test_45_success.py` |
+| 검색 URL | `https://www.wanted.co.kr/search?query=카카오&tab=company` |
+| 회사 탭 클릭 | `[role="tab"]:has-text("회사")` 선택자로 클릭 성공 |
+| 회사 항목 수 | 8개 (가시적 링크) |
+| 선택한 회사 | 카카오모빌리티 |
+| 이동된 URL | `https://www.wanted.co.kr/company/1682` |
+
+### 테스트 흐름
+1. 비로그인 상태로 `https://www.wanted.co.kr/search?query=카카오&tab=company` 직접 진입
+2. **회사 탭** 클릭 확인 (이미 tab=company로 진입했으므로 정상 활성화)
+3. `/company/` 패턴 링크 8개 탐색 확인
+4. 첫 번째 회사(카카오모빌리티, `/company/1682`) 클릭
+5. 회사 상세 페이지(`https://www.wanted.co.kr/company/1682`) 이동 확인 ✅
+
+
+=== 에러 ===
+

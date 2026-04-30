@@ -1,0 +1,29 @@
+=== 실행 시간 ===
+2026-04-28 17:37:38.952337
+
+=== 종료 코드 ===
+0
+
+=== 출력 ===
+**AUTOMATION_SUCCESS**
+
+## 테스트 케이스 49 실행 결과
+
+### ✅ 성공
+
+**실행 흐름:**
+1. `work/auth_state.json` 세션 로드로 로그인 상태 진입
+2. 채용 홈(`https://www.wanted.co.kr/`) 접속
+3. GNB 검색 버튼(`button[aria-label*="검색"]`) 클릭 → 검색 화면 전환
+4. `[role="dialog"] a` 선택자로 검색 오버레이 내 **인기 검색어 8개** 발견
+5. 첫 번째 인기 검색어(`qa`, search_method=popular)의 href로 직접 이동
+6. 검색 결과 페이지 랜딩 확인: `https://www.wanted.co.kr/search?query=qa&search_method=popular&tab=overview`
+
+**검증 완료:**
+- 인기 검색어 항목 노출: ✅ 8개 확인
+- 임의의 검색어 선택: ✅ `qa` 선택
+- 선택한 인기 검색어로 검색 결과 페이지 랜딩: ✅ URL에 `query=qa&search_method=popular` 포함 확인
+
+
+=== 에러 ===
+
