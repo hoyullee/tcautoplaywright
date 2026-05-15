@@ -76,7 +76,7 @@ def main():
     env = os.environ.copy()
     
     result = subprocess.run(
-        ['python', 'download_tc.py'],
+        [sys.executable, 'download_tc.py'],
         env=env
     )
     
@@ -92,7 +92,7 @@ def main():
     print("=" * 60 + "\n")
     
     result = subprocess.run(
-        ['python', 'claude_automation.py'],
+        [sys.executable, 'claude_automation.py'],
         env=env
     )
     

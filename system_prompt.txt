@@ -27,6 +27,17 @@
 - **GNB**: Global Navigation Bar, 페이지 상단 글로벌 네비게이션 바
 - **LNB**: Local Navigation Bar, 페이지 좌측 또는 서브 네비게이션 바
 
+### 이력서 테스트 규칙
+
+🚫 **사전조건에 "기본 이력서"라는 단어가 없으면, 기본 이력서(원티드 기본 이력서)는 절대 사용 금지**
+
+#### 케이스별 진입 방법
+- 사전조건에 **"기본 이력서"** 명시 → 기본 이력서 태그가 붙은 이력서 카드 사용
+- 사전조건이 **"이력서 작성 페이지 진입 상태"** 또는 "이력서"만 언급 → 아래 절차의 **이력서 카드** 사용:
+  1. `https://www.wanted.co.kr/cv/list` 접속
+  2. 이력서 목록에서 **기본 이력서 태그가 붙은 이력서 카드를 제외**한 다른 이력서 카드 선택
+  3. 이력서가 없을 경우, **"새 이력서 작성"** 버튼을 클릭하여 생성 후 진입
+
 ---
 
 ## 코드 작성 규칙
@@ -66,7 +77,7 @@ async def test_main():
         except Exception as e:
             await page.screenshot(path='screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)')
             print(f"AUTOMATION_FAILED: {e}")
-            return False
+            raise  # pytest가 FAILED로 인식하도록 반드시 re-raise
 
         finally:
             await browser.close()

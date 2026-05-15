@@ -83,7 +83,7 @@ def create_claude_prompt(test_case):
 
 ## 작업
 1. `test/test_{test_no_str}_working.py` 생성 후 코드 작성
-2. `python test/test_{test_no_str}_working.py` 실행
+2. `python3 test/test_{test_no_str}_working.py` 실행
 3. 성공 시 `test/test_{test_no_str}_success.py`로 이름 변경, 실패 시 수정 후 재시도
 4. 마지막에 반드시 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
 
@@ -107,7 +107,6 @@ def run_claude_code(prompt, test_no, max_attempts=3):
         logging.info(f"🤖 Claude Code 실행 시도 {attempt}/{max_attempts}")
 
         try:
-            # ⭐ 프롬프트 파일로 저장 (디버깅용)
             prompt_file = f'work/test_{test_no_str}_prompt.txt'
             with open(prompt_file, 'w', encoding='utf-8') as f:
                 f.write(prompt)
@@ -129,10 +128,10 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                 errors='replace',
                 shell=sys.platform == 'win32'
             )
-            
+
             output = result.stdout
             error = result.stderr
-            
+
             # 로그 저장
             log_file = f'work/test_{test_no_str}_attempt_{attempt}.log'
             with open(log_file, 'w', encoding='utf-8') as f:
@@ -242,7 +241,7 @@ def main():
         print("="*60)
 
         prompt = create_claude_prompt(test_case)
-        success, output, error = run_claude_code(prompt, test_no, max_attempts=3)
+        success, _, error = run_claude_code(prompt, test_no, max_attempts=3)
 
         results.append({
             'test_no': test_no,
