@@ -2,6 +2,11 @@
 이 프로젝트는 **Google Sheets에 작성된 자연어 TestCase**를 자동으로 **Playwright 코드로 변환**하고, **실행, 재시도, 결과 저장**까지 수행하는 No-Code to Automated Testing 시스템입니다.
 Playwright를 기반으로 하며, **Mac OS** 환경에서 구현되었으며 **PC 브라우저**에서 실행됩니다.
 
+## branch 생성 기준
+- 시작 날짜_branch명
+ - 예시) 20260519_project_automation
+
+---
 
 ## 📦 사전 요구사항
 
