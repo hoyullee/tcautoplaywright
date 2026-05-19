@@ -122,7 +122,7 @@ def run_claude_code(prompt, test_no, max_attempts=3):
                 input=prompt,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=600,
                 cwd=os.getcwd(),
                 encoding='utf-8',
                 errors='replace',
@@ -188,7 +188,7 @@ def run_claude_code(prompt, test_no, max_attempts=3):
         except subprocess.TimeoutExpired:
             logging.warning(f"⏱️ 타임아웃 (5분)")
             if attempt >= max_attempts:
-                return False, None, "타임아웃"
+                return False, None, "타임아웃 (10분)"
                 
         except Exception as e:
             logging.error(f"⚠️ 예외: {e}")

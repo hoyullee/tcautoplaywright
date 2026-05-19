@@ -92,12 +92,70 @@ if __name__ == "__main__":
 2. `page.get_by_text('텍스트')`
 3. `page.locator('css-selector')`
 
+### hover로만 노출되는 버튼 처리 패턴
+마우스 hover 시에만 나타나는 버튼(예: 카드 위의 더보기/3점 버튼)은 아래 순서로 처리:
+```python
+# 1. Playwright hover 사용 (mouse.move 대신)
+await target_element.hover()
+await page.wait_for_timeout(500)
+
+# 2. hover 후 버튼이 visible 상태가 될 때까지 대기
+btn = target_element.locator('[aria-label="더보기"]')
+await btn.wait_for(state='visible', timeout=5000)
+await btn.click()
+
+# 3. 위 방법 실패 시 JS로 강제 클릭 (hover 없이도 동작)
+await page.evaluate("""(el) => {
+    el.dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+    el.dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
+}""", await target_element.element_handle())
+await page.wait_for_timeout(500)
+await btn.click(force=True)
+```
+
 ### 스크린샷 규칙 (반드시 준수)
 - **TC당 스크린샷은 1장만** 허용
 - 성공 시: `screenshots/test_{NO}_success.png  # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
 - 실패 시: `screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
 - 중간 단계(페이지 로드, 버튼 클릭 등) 스크린샷 절대 금지
 - `page.screenshot()`은 try 블록 마지막(성공 확정 후)과 except 블록(실패 확정 후) 각각 1회씩만 호출
+
+### page.evaluate() 성능 규칙
+
+> ⚠️ 이 규칙은 **`page.evaluate()` 내부 JS 코드**에만 적용됩니다.
+> Playwright 로케이터(`page.locator('[class*="..."]')`)는 해당 없음.
+
+`page.evaluate()` 내부의 `querySelectorAll`에서 `[class*="..."]` 셀렉터는 DOM 전체를 순회하므로 **가능하면 시맨틱 셀렉터로 대체**하세요.
+
+#### 셀렉터 대체 우선순위 (evaluate 내부)
+| 상황 | 느린 방식 | 빠른 대체 |
+|------|-----------|-----------|
+| 체크박스 탐색 | `[class*="check"]` | `input[type="checkbox"], [role="checkbox"]` |
+| 다이얼로그/모달 탐색 | `[class*="modal"]` | `[role="dialog"]` |
+| 버튼 탐색 | `[class*="button"]` | `button, [role="button"]` |
+
+> ⚠️ `[class*="overlay"]`는 로딩 스피너·배경 딤 등 다이얼로그가 아닌 요소에도 사용되므로 `[role="dialog"]`로 대체하지 말 것. 오버레이를 찾아야 한다면 목적에 맞는 구체적 셀렉터를 사용하세요.
+> 시맨틱 속성이 없는 요소는 `class*=` 사용을 허용하되, `.slice(0, N)`으로 처리 수를 제한하세요.
+
+#### getBoundingClientRect() 규칙
+`getBoundingClientRect()`는 호출마다 레이아웃 재계산(reflow)을 강제하므로:
+```javascript
+// 🚫 지양 — 매칭 요소 전체에 getBoundingClientRect 호출
+[...document.querySelectorAll('button')].map(el => {
+    const rect = el.getBoundingClientRect();
+    return { visible: rect.width > 0 };
+});
+
+// ✅ 권장 — slice로 상한 제한 후 처리
+[...document.querySelectorAll('button')].slice(0, 30).map(el => {
+    const rect = el.getBoundingClientRect();
+    return { visible: rect.width > 0 };
+});
+```
+
+**규칙 요약:**
+- `querySelectorAll` + `.map()` + `getBoundingClientRect()` 조합 시 반드시 `.slice(0, N)` 선행 (체크박스: 20개, 버튼: 30개 권장)
+- 시맨틱 속성(`role`, `type`, `tag`)이 있는 경우 `class*=` 대신 그것을 우선 사용
 
 ### 절대 금지
 - `sys.stdout = io.TextIOWrapper(...)` 사용 금지 — pytest stdout 캡처를 파괴함

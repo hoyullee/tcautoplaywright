@@ -39,12 +39,7 @@ pip install playwright requests pytest pytest-playwright pytest-asyncio
 
 ### 4. Playwright 브라우저 설치
 ```bash
-# Python Playwright
-playwright install chromium firefox
-
-# Node.js Playwright (선택사항)
-npm install
-npx playwright install
+playwright install chromium
 ```
 
 ### 5. pytest 설정 파일 생성 (설정되어 있음(변경 불필요))
@@ -209,7 +204,7 @@ pytest test/ -v # 상세 정보 노출
 pytest test/ -v -n 4
 
 # 특정 테스트만 실행
-pytest test/test_1_success.py -v
+pytest test/test_01_success.py -v
 
 # 성공한 테스트만
 pytest test/ -v -k "success"
@@ -218,29 +213,49 @@ pytest test/ -v -k "success"
 #### Python으로 직접 실행
 ```bash
 # 개별 실행
-python test/test_1_success.py
+python3 test/test_01_success.py
 ```
 
-### 옵션 3: 특정 테스트 케이스만 재실행
+### 옵션 3: 전체 테스트 순차 실행 + 결과 요약
+
+생성된 모든 테스트 파일을 순서대로 실행하고, 종료 후 성공/실패 케이스를 요약합니다.
+
+```bash
+python3 run_all_tests.py
+```
+
+- 각 TC가 실행되는 과정을 실시간으로 확인 가능
+- TC #05(로그아웃) 완료 후 TC #03(로그인)을 자동 재실행하여 세션 복원
+- 전체 종료 후 실패한 케이스 목록 출력:
+```
+📊 최종 결과
+✅ 성공: 59개  /  ❌ 실패: 2개  /  전체: 61개
+
+❌ 실패한 케이스:
+   - TC #15  (test_15_success.py)
+   - TC #38  (test_38_success.py)
+```
+
+### 옵션 4: 특정 테스트 케이스만 재실행
 
 코드 생성에 실패한 특정 케이스만 단독으로 다시 실행할 수 있습니다.
 
 ```bash
 # NO:4 케이스만 재실행
-python claude_automation.py --test-no 4
+python3 claude_automation.py --test-no 4
 ```
 
 - 전체 케이스를 처음부터 다시 실행하지 않아도 됩니다.
 - `test_cases.json`에서 해당 `NO` 값을 가진 케이스만 찾아 실행합니다.
-- 성공 시 `test/test_4_success.py`로 저장됩니다.
+- 성공 시 `test/test_04_success.py`로 저장됩니다.
 
-### 옵션 4: 단계별 수동 실행
+### 옵션 5: 단계별 수동 실행
 ```bash
 # 1. TC 다운로드만
-python download_tc.py
+python3 download_tc.py
 
-# 2. 코드 생성만 (Claude Code 수동)
-claude code generate --input test_cases.json
+# 2. 특정 TC 코드 생성만
+python3 claude_automation.py --test-no 1
 
 # 3. 테스트 실행만
 pytest test/ -v
@@ -293,27 +308,25 @@ sheets-automation/
 ├── test_results/               # 실행 결과 JSON
 │   └── result_20260424_172603.json
 ├── screenshots/                # 테스트 스크린샷
-│   ├── test_1_success.png
-│   └── test_1_failed.png
+│   ├── test_01_success.png
+│   └── test_01_failed.png
 ├── logs/                       # 실행 로그
 │   └── test_20260424_172603.log
 ├── work/                       # 임시 작업 파일 (프롬프트, 시도 로그 등)
-│   ├── auth_state.json
+│   ├── auth_state.json         # 로그인 세션 저장 파일
 │   ├── test_N_prompt.txt
 │   └── test_N_attempt_M.log
 ├── .github/
 │   └── workflows/
 │       └── run-tests.yml       # GitHub Actions 워크플로우
-├── claude_automation.py        # Claude API 기반 테스트 자동 생성
+├── claude_automation.py        # Claude Code 기반 테스트 자동 생성
 ├── run_automation.py           # 전체 자동화 메인 스크립트
+├── run_all_tests.py            # 전체 테스트 순차 실행 + 결과 요약
 ├── download_tc.py              # Google Drive TC 다운로드
-├── check_page.py               # 페이지 상태 확인 유틸리티
-├── context.md                  # 테스트 대상 앱 컨텍스트
-├── system_prompt.txt           # Claude 시스템 프롬프트
+├── system_prompt.txt           # Claude 시스템 프롬프트 (코드 작성 규칙 포함)
 ├── test_cases.json             # 다운로드된 TC
 ├── pytest.ini                  # pytest 설정
 ├── requirements.txt            # Python 의존성
-├── package.json                # Node.js 의존성 (Playwright)
 └── README.md
 ```
 

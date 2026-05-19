@@ -196,11 +196,10 @@ async def test_main():
 
             # 지원 페이지 DOM 분석
             dom_info = await active_page.evaluate("""() => {
-                // 체크박스 요소
+                // 체크박스 요소 (명확한 셀렉터만 사용, 상위 20개만 처리)
                 const checkboxes = [...document.querySelectorAll(
-                    'input[type="checkbox"], [role="checkbox"], [class*="check"], [class*="Check"], ' +
-                    '[class*="resume"], [class*="Resume"]'
-                )].map(el => {
+                    'input[type="checkbox"], [role="checkbox"]'
+                )].slice(0, 20).map(el => {
                     const rect = el.getBoundingClientRect();
                     return {
                         tag: el.tagName,
@@ -216,8 +215,9 @@ async def test_main():
                     };
                 });
 
-                // 버튼 목록
+                // 버튼 목록 (상위 30개만 처리)
                 const buttons = [...document.querySelectorAll('button, [role="button"]')]
+                    .slice(0, 30)
                     .map(el => {
                         const rect = el.getBoundingClientRect();
                         return {
@@ -230,12 +230,10 @@ async def test_main():
                     })
                     .filter(b => b.text.length > 0);
 
-                // 모달/오버레이 감지
-                const modals = [...document.querySelectorAll(
-                    '[role="dialog"], [class*="modal"], [class*="Modal"], ' +
-                    '[class*="overlay"], [class*="Overlay"], [class*="apply"], [class*="Apply"]'
-                )].filter(el => el.offsetParent !== null)
-                 .map(el => el.innerText.substring(0, 500));
+                // 모달/오버레이 감지 (role="dialog"만 사용)
+                const modals = [...document.querySelectorAll('[role="dialog"]')]
+                    .filter(el => el.offsetParent !== null)
+                    .map(el => el.innerText.substring(0, 500));
 
                 return { checkboxes, buttons, modals, bodyText: document.body.innerText.substring(0, 2000) };
             }""")
