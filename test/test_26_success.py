@@ -123,7 +123,7 @@ async def test_main():
                     page.locator('[class*="modal"]:has-text("이메일")'),
                     page.locator('[class*="login"]:has-text("이메일")'),
                     page.locator('input[type="email"]'),
-                    page.locator('button:has-text("이메일로 계속하기")'),
+                    page.locator('button:has-text("이메일로 시작하기")'),
                 ]
                 modal_found = False
                 for modal_sel in modal_selectors:
@@ -155,18 +155,18 @@ async def test_main():
             # 5. 로그인 수행 (세션 저장을 위해)
             print("[INFO] 로그인 수행 중...")
 
-            # '이메일로 계속하기' 버튼 탐색
+            # '이메일로 시작하기' 버튼 탐색
             email_continue_btn = None
             continue_selectors = [
-                page.get_by_role('button', name='이메일로 계속하기'),
-                page.locator('button:has-text("이메일로 계속하기")').first,
+                page.get_by_role('button', name='이메일로 시작하기'),
+                page.locator('button:has-text("이메일로 시작하기")').first,
                 page.locator('button:has-text("이메일")').first,
             ]
             for sel in continue_selectors:
                 try:
                     await sel.wait_for(timeout=5000, state='visible')
                     email_continue_btn = sel
-                    print("[OK] '이메일로 계속하기' 버튼 발견")
+                    print("[OK] '이메일로 시작하기' 버튼 발견")
                     break
                 except Exception:
                     continue
@@ -174,7 +174,7 @@ async def test_main():
             if email_continue_btn is not None:
                 await email_continue_btn.click()
                 await page.wait_for_timeout(2000)
-                print("[OK] '이메일로 계속하기' 클릭 완료")
+                print("[OK] '이메일로 시작하기' 클릭 완료")
 
             # 이메일 입력
             print("[INFO] 이메일 입력 중...")

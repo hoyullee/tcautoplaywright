@@ -113,7 +113,7 @@ async def test_main():
                 await page.wait_for_url('**/login**', timeout=15000)
                 await page.wait_for_timeout(2000)
 
-                email_btn = page.get_by_role('button', name='이메일로 계속하기')
+                email_btn = page.get_by_role('button', name='이메일로 시작하기')
                 await email_btn.wait_for(timeout=10000)
                 await email_btn.click()
                 await page.wait_for_timeout(2000)

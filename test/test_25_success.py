@@ -80,13 +80,13 @@ async def test_main():
             assert is_login_page, f"회원가입/로그인 페이지로 이동하지 않았습니다. 현재 URL: {current_url}"
             print(f"[OK] 회원가입/로그인 페이지 정상 진입 확인: {current_url}")
 
-            # 5. '이메일로 계속하기' 버튼 클릭
-            print("[INFO] '이메일로 계속하기' 버튼 탐색 중...")
-            email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
+            # 5. '이메일로 시작하기' 버튼 클릭
+            print("[INFO] '이메일로 시작하기' 버튼 탐색 중...")
+            email_continue_btn = page.get_by_role('button', name='이메일로 시작하기')
             await email_continue_btn.wait_for(timeout=10000, state='visible')
             await email_continue_btn.click()
             await page.wait_for_timeout(2000)
-            print("[OK] '이메일로 계속하기' 클릭 완료")
+            print("[OK] '이메일로 시작하기' 클릭 완료")
 
             # 6. 이메일 입력
             print("[INFO] 이메일 입력 중...")

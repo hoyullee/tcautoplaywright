@@ -4,652 +4,427 @@ import asyncio
 import os
 import pytest
 
-REAL_UA = (
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-    'AppleWebKit/537.36 (KHTML, like Gecko) '
-    'Chrome/124.0.0.0 Safari/537.36'
-)
-
-
-def safe_print(msg):
-    try:
-        print(msg)
-    except Exception:
-        print(msg.encode('utf-8', errors='replace').decode('ascii', errors='replace'))
-
-
 @pytest.mark.asyncio
 async def test_main():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, channel='chrome')
+        browser = await p.chromium.launch(headless=False, channel='chrome')
         context = await browser.new_context(
             locale='ko-KR',
             timezone_id='Asia/Seoul',
-            user_agent=REAL_UA,
-            viewport={'width': 1280, 'height': 900},
             storage_state='work/auth_state.json',
+            viewport={'width': 1280, 'height': 1080},
         )
         page = await context.new_page()
 
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # ── Step 1: 이력서 목록 페이지 진입 ──
-            safe_print("[INFO] 이력서 목록 페이지(cv/list) 진입...")
+            # ── 이력서 진입 코드 ──
             await page.goto('https://www.wanted.co.kr/cv/list', timeout=60000)
             await page.wait_for_load_state('domcontentloaded')
-            await page.wait_for_timeout(4000)
-            safe_print(f"[OK] 현재 URL: {page.url}")
+            await page.wait_for_timeout(3000)
+            assert 'cv/list' in page.url, f"이력서 목록 페이지 진입 실패: {page.url}"
 
-            # ── Step 2: 페이지 구조 파악 - 이력서 편집 또는 새 이력서 링크 찾기 ──
-            page_info = await page.evaluate("""() => {
-                const result = {
-                    url: location.href,
-                    bodyText: (document.body.innerText || '').replace(/\\s+/g, ' ').substring(0, 1000),
-                    cvLinks: [],
-                    allButtons: [],
-                };
-                const allEls = [...document.querySelectorAll('a, button, [role="button"]')];
-                for (const el of allEls) {
-                    const text = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
-                    const href = el.href || '';
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0 && text.length > 0) {
-                        result.allButtons.push({ text: text.substring(0, 60), href: href.substring(0, 150) });
-                        if (href.includes('/cv/') || href.includes('/resume/')) {
-                            result.cvLinks.push({ text: text.substring(0, 60), href: href.substring(0, 150) });
-                        }
-                    }
-                }
-                return result;
-            }""")
+            all_cards = page.locator('[class*="ResumeItem_ResumeItem"]:has([class*="__title__"])')
+            total = await all_cards.count()
 
-            safe_print(f"[INFO] 현재 URL: {page_info['url']}")
-            safe_print(f"[INFO] 페이지 미리보기: {page_info['bodyText'][:600]}")
-            safe_print(f"[INFO] CV 링크 ({len(page_info['cvLinks'])}개):")
-            for lnk in page_info['cvLinks'][:10]:
-                safe_print(f"  - '{lnk['text']}' href='{lnk['href']}'")
-            safe_print(f"[INFO] 전체 버튼 ({len(page_info['allButtons'])}개):")
-            for btn in page_info['allButtons'][:15]:
-                safe_print(f"  - '{btn['text']}' href='{btn['href']}'")
-
-            # ── Step 3: 이력서 편집/작성 페이지로 이동 ──
-            cv_edit_url = None
-
-            # cv/new, cv/create, cv/write 링크 우선 탐색
-            for lnk in page_info['cvLinks']:
-                href = lnk['href']
-                if any(pat in href for pat in ['/cv/new', '/cv/create', '/cv/write']):
-                    cv_edit_url = href
-                    break
-
-            # 기존 이력서 편집 링크
-            if not cv_edit_url:
-                for lnk in page_info['cvLinks']:
-                    href = lnk['href']
-                    if ('/cv/' in href and
-                        'cv/list' not in href and
-                        'cv/intro' not in href and
-                        'cv/faq' not in href):
-                        cv_edit_url = href
+            if total < 2:
+                for kw in ['새 이력서 작성', '새 이력서']:
+                    btn = page.get_by_text(kw, exact=False)
+                    if await btn.count() > 0:
+                        await btn.first.click()
+                        await page.wait_for_load_state('domcontentloaded')
+                        await page.wait_for_timeout(3000)
+                        await page.goto('https://www.wanted.co.kr/cv/list', timeout=30000)
+                        await page.wait_for_load_state('domcontentloaded')
+                        await page.wait_for_timeout(3000)
                         break
+                total = await all_cards.count()
 
-            if cv_edit_url:
-                safe_print(f"[INFO] CV 편집 URL로 이동: {cv_edit_url}")
-                await page.goto(cv_edit_url, timeout=30000)
-            else:
-                # 버튼 클릭으로 이동 시도
-                btn_keywords = ['새 이력서 작성', '새 이력서', '이력서 작성', '이력서 만들기',
-                                '새로 만들기', '작성하기', '이력서 추가',
-                                '이력서 편집', '편집하기', '수정하기', '편집']
-                for kw in btn_keywords:
-                    try:
-                        btn = page.get_by_text(kw, exact=False).first
-                        if await btn.count() > 0:
-                            await btn.click(timeout=8000)
-                            safe_print(f"[OK] 버튼 클릭: '{kw}'")
-                            break
-                    except Exception as e:
-                        safe_print(f"[WARN] '{kw}' 클릭 실패: {e}")
+            assert total >= 2, "기본 이력서 외 이력서 카드가 없습니다"
 
+            await all_cards.nth(1).click()
             await page.wait_for_load_state('domcontentloaded')
-            await page.wait_for_timeout(4000)
-            safe_print(f"[INFO] 이동 후 URL: {page.url}")
+            await page.wait_for_timeout(3000)
+            assert '/cv/' in page.url and 'cv/list' not in page.url, f"이력서 편집 페이지 진입 실패: {page.url}"
 
-            # ── Step 4: 현재 페이지 구조 파악 ──
-            safe_print("[INFO] 현재 페이지 구조 파악 중...")
-            page_scan = await page.evaluate("""() => {
-                const result = {
-                    url: location.href,
-                    bodyText: (document.body.innerText || '').replace(/\\s+/g, ' ').substring(0, 4000),
-                    inputs: [],
-                    buttons: [],
-                };
+            print(f"[OK] 이력서 편집 페이지 진입: {page.url}")
+            await page.wait_for_timeout(2000)
 
-                const inputEls = document.querySelectorAll('input, textarea, [contenteditable="true"], select');
-                for (const el of inputEls) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        result.inputs.push({
-                            tag: el.tagName,
-                            type: el.type || '',
-                            placeholder: (el.placeholder || '').substring(0, 80),
-                            id: el.id || '',
-                            name: el.name || '',
-                            classes: (el.className || '').substring(0, 80),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                            width: Math.round(rect.width),
-                            height: Math.round(rect.height),
-                        });
-                    }
-                }
-
-                const btnEls = [...document.querySelectorAll('button, [role="button"], a')];
-                for (const el of btnEls) {
-                    const text = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
-                    const href = el.href || '';
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0 && text.length > 0 && text.length < 60) {
-                        result.buttons.push({
-                            tag: el.tagName,
-                            text: text.substring(0, 50),
-                            href: href.substring(0, 100),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                        });
-                    }
-                }
-
-                return result;
-            }""")
-
-            safe_print(f"[INFO] 현재 URL: {page_scan['url']}")
-            safe_print(f"[INFO] 페이지 텍스트 일부: {page_scan['bodyText'][:2000]}")
-            safe_print(f"[INFO] 입력 요소 ({len(page_scan['inputs'])}개):")
-            for inp in page_scan['inputs'][:20]:
-                safe_print(f"  - [{inp['tag']:10s}] ({inp['x']},{inp['y']}) type='{inp['type']}' placeholder='{inp['placeholder']}' id='{inp['id']}'")
-            safe_print(f"[INFO] 버튼 요소 ({len(page_scan['buttons'])}개):")
-            for btn in page_scan['buttons'][:20]:
-                safe_print(f"  - [{btn['tag']:10s}] ({btn['x']},{btn['y']}) '{btn['text']}'")
-
-            # ── Step 5: '경력' 섹션으로 이동 ──
-            safe_print("[INFO] '경력' 섹션으로 이동 시도...")
-
-            career_nav_keywords = ['경력', '경력사항', '경력 사항']
-            for kw in career_nav_keywords:
-                try:
-                    els = page.get_by_text(kw, exact=True)
-                    cnt = await els.count()
-                    if cnt > 0:
-                        for i in range(cnt):
-                            try:
-                                el = els.nth(i)
-                                if await el.is_visible():
-                                    await el.click(timeout=5000)
-                                    await page.wait_for_timeout(1500)
-                                    safe_print(f"[OK] '{kw}' 클릭 성공 (index={i})")
-                                    break
-                            except Exception:
-                                pass
-                        break
-                except Exception as e:
-                    safe_print(f"[WARN] '{kw}' 클릭 실패: {e}")
-
-            # 경력 관련 요소 탐색
-            career_area = await page.evaluate("""() => {
-                const result = {
-                    hasCareerSection: false,
-                    careerElements: [],
-                    careerButtons: [],
-                };
-
-                const allEls = [...document.querySelectorAll('*')];
-                for (const el of allEls) {
-                    const rawText = (el.innerText || el.textContent || '').trim();
-                    const normText = rawText.replace(/\\s+/g, ' ');
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0 &&
-                        (normText === '경력' || normText === '경력사항' || normText.includes('경력 추가') ||
-                         normText.includes('경력사항 추가') || normText === '+ 경력 추가') &&
-                        normText.length < 100) {
-                        result.hasCareerSection = true;
-                        result.careerElements.push({
-                            tag: el.tagName,
-                            text: normText.substring(0, 60),
-                            classes: (el.className || '').substring(0, 100),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                            width: Math.round(rect.width),
-                            height: Math.round(rect.height),
-                        });
-                    }
-                }
-
-                const addBtns = [...document.querySelectorAll('button, [role="button"]')];
-                for (const btn of addBtns) {
-                    const text = (btn.innerText || btn.textContent || '').trim().replace(/\\s+/g, ' ');
-                    const rect = btn.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0 &&
-                        (text.includes('경력') || text.includes('추가')) &&
-                        text.length < 80) {
-                        result.careerButtons.push({
-                            tag: btn.tagName,
-                            text: text.substring(0, 60),
-                            classes: (btn.className || '').substring(0, 100),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                        });
-                    }
-                }
-
-                return result;
-            }""")
-
-            safe_print(f"[INFO] 경력 섹션 발견: {career_area['hasCareerSection']}")
-            for el in career_area['careerElements'][:10]:
-                safe_print(f"  - [{el['tag']:12s}] ({el['x']},{el['y']}) '{el['text']}'")
-            for btn in career_area['careerButtons'][:10]:
-                safe_print(f"  - BTN [{btn['tag']:12s}] ({btn['x']},{btn['y']}) '{btn['text']}'")
-
-            # ── Step 6: '경력 추가' 버튼 클릭 ──
-            safe_print("[INFO] '경력 추가' 버튼 클릭 시도...")
-            career_add_clicked = False
-
-            add_btn_keywords = [
-                '경력 추가', '경력추가', '+ 경력 추가', '경력 입력',
-                '경력사항 추가', '+ 추가', '추가',
-            ]
-
-            for kw in add_btn_keywords:
-                try:
-                    btns = page.get_by_text(kw, exact=False)
-                    cnt = await btns.count()
-                    if cnt > 0:
-                        for i in range(cnt):
-                            try:
-                                btn = btns.nth(i)
-                                if await btn.is_visible():
-                                    await btn.click(timeout=5000)
-                                    await page.wait_for_timeout(2000)
-                                    safe_print(f"[OK] '{kw}' 버튼 클릭 성공 (index={i})")
-                                    career_add_clicked = True
-                                    break
-                            except Exception:
-                                pass
-                    if career_add_clicked:
-                        break
-                except Exception as e:
-                    safe_print(f"[WARN] '{kw}' 클릭 실패: {e}")
-
-            if not career_add_clicked:
-                safe_print("[WARN] '경력 추가' 버튼을 찾지 못함. 현재 보이는 경력 폼으로 진행...")
-
-            await page.wait_for_timeout(1000)
-
-            # ── Step 7: 경력 입력 폼 상태 파악 ──
-            form_scan = await page.evaluate("""() => {
-                const result = {
-                    inputs: [],
-                    textareas: [],
-                    selects: [],
-                };
-
-                const inputEls = document.querySelectorAll('input:not([type="hidden"]), textarea, select, [contenteditable="true"]');
-                for (const el of inputEls) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        const info = {
-                            tag: el.tagName,
-                            type: el.type || '',
-                            placeholder: (el.placeholder || '').substring(0, 100),
-                            id: (el.id || '').substring(0, 60),
-                            name: (el.name || '').substring(0, 60),
-                            value: (el.value || '').substring(0, 60),
-                            classes: (el.className || '').substring(0, 120),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                            width: Math.round(rect.width),
-                            height: Math.round(rect.height),
-                        };
-                        if (el.tagName === 'TEXTAREA') result.textareas.push(info);
-                        else if (el.tagName === 'SELECT') result.selects.push(info);
-                        else result.inputs.push(info);
-                    }
-                }
-
-                return result;
-            }""")
-
-            safe_print(f"[INFO] 입력 요소 ({len(form_scan['inputs'])}개):")
-            for inp in form_scan['inputs']:
-                safe_print(f"  - INPUT ({inp['x']},{inp['y']}) type='{inp['type']}' placeholder='{inp['placeholder']}' id='{inp['id']}'")
-            safe_print(f"[INFO] textarea ({len(form_scan['textareas'])}개):")
-            for ta in form_scan['textareas']:
-                safe_print(f"  - TEXTAREA ({ta['x']},{ta['y']}) placeholder='{ta['placeholder']}' id='{ta['id']}'")
-            safe_print(f"[INFO] select ({len(form_scan['selects'])}개):")
-            for sel in form_scan['selects']:
-                safe_print(f"  - SELECT ({sel['x']},{sel['y']}) id='{sel['id']}'")
-
-            # ── Step 8: 경력 항목 입력 ──
+            # 테스트 데이터
             company_name = "원티드랩"
-            start_year = "2022"
-            start_month = "01"
-            end_year = "2023"
-            end_month = "12"
-            employment_type = "정규직"
             achievement_title = "서비스 성능 개선"
-            achievement_detail = "API 응답 속도를 30% 향상시켜 사용자 경험을 개선하였습니다."
+            achievement_detail = "API 응답 속도를 30% 향상시켜 사용자 경험을 크게 개선하였습니다."
 
-            inputs_filled = {
+            results = {
                 'company': False,
                 'start_date': False,
-                'end_date': False,
-                'employment_type': False,
+                'employ_type': False,
                 'achievement': False,
                 'achievement_detail': False,
             }
 
-            # ── 8-1: 회사명 입력 ──
-            safe_print("[INFO] 회사명 입력 시도...")
-            company_keywords = ['회사명', '회사 이름', '기업명', '회사', 'company', 'Company']
-            for kw in company_keywords:
-                try:
-                    inp = page.locator(f'input[placeholder*="{kw}"]').first
-                    if await inp.count() > 0 and await inp.is_visible():
-                        await inp.click(timeout=5000)
-                        await inp.fill(company_name)
-                        inputs_filled['company'] = True
-                        safe_print(f"[OK] 회사명 입력 성공 (placeholder='{kw}')")
-                        break
-                except Exception as e:
-                    safe_print(f"[WARN] '{kw}' placeholder 입력 실패: {e}")
+            # ── 1. 회사명 입력 ──
+            print("\n[INFO] 회사명 입력...")
+            comp_inp = page.locator('input[placeholder*="회사명"]').first
+            if await comp_inp.count() > 0:
+                await comp_inp.scroll_into_view_if_needed()
+                await page.wait_for_timeout(300)
+                await comp_inp.click()
+                await page.wait_for_timeout(300)
+                # 기존 내용 지우기
+                await comp_inp.fill('')
+                await page.wait_for_timeout(200)
+                await comp_inp.type(company_name, delay=100)
+                await page.wait_for_timeout(1200)  # 자동완성 대기
 
-            if not inputs_filled['company']:
-                # text 타입의 첫 번째 visible input에 입력 시도
-                for i, inp_info in enumerate(form_scan['inputs']):
-                    if inp_info['type'] in ('text', ''):
+                # 자동완성 옵션 탐색
+                all_options = page.locator('[class*="CompanyNameAutoComplete"][class*="option"]')
+                opts_cnt = await all_options.count()
+                print(f"[INFO] CompanyNameAutoComplete 옵션 수: {opts_cnt}")
+
+                if opts_cnt > 0:
+                    selected = False
+                    for i in range(opts_cnt):
+                        opt = all_options.nth(i)
                         try:
-                            inp = page.locator('input').nth(i)
-                            if await inp.is_visible():
-                                await inp.click(timeout=5000)
-                                await inp.fill(company_name)
-                                inputs_filled['company'] = True
-                                safe_print(f"[OK] 회사명 input[{i}]에 입력 성공")
+                            txt = await opt.inner_text()
+                            txt = txt.strip()
+                            print(f"  option[{i}]: '{txt}'")
+                            # 원티드랩 정확히 매칭 (파트너스, 러닝, 커리어 등 제외)
+                            if txt == '원티드랩':
+                                await opt.click(timeout=5000)
+                                selected = True
+                                print(f"[OK] '원티드랩' 선택 (index={i})")
                                 break
                         except Exception as e:
-                            safe_print(f"[WARN] input[{i}] 입력 실패: {e}")
+                            print(f"  option[{i}] 오류: {e}")
+
+                    if not selected:
+                        # 직접 입력하기 옵션 선택
+                        for i in range(opts_cnt):
+                            opt = all_options.nth(i)
+                            try:
+                                txt = (await opt.inner_text()).strip()
+                                if '직접 입력' in txt:
+                                    await opt.click(timeout=5000)
+                                    selected = True
+                                    print(f"[OK] '직접 입력하기' 선택")
+                                    break
+                            except Exception:
+                                pass
+
+                        if not selected:
+                            # 첫 번째 옵션 선택 (fallback)
+                            try:
+                                await all_options.first.click(timeout=5000)
+                                selected = True
+                                print("[OK] fallback: 첫 번째 옵션 선택")
+                            except Exception as e:
+                                print(f"[WARN] fallback 실패: {e}")
+                                await page.keyboard.press('Escape')
+                else:
+                    await page.keyboard.press('Escape')
+                    print("[WARN] 자동완성 없음")
+
+                await page.wait_for_timeout(500)
+                cur_val = await comp_inp.input_value()
+                print(f"[INFO] 회사명 현재 값: '{cur_val}'")
+                results['company'] = bool(cur_val and cur_val != '회사명' and cur_val != '')
+                if results['company']:
+                    print(f"[OK] 회사명 입력 완료: '{cur_val}'")
 
             await page.wait_for_timeout(500)
 
-            # ── 8-2: 재직 날짜 입력 ──
-            safe_print("[INFO] 재직 날짜 입력 시도...")
+            # ── 2. 재직 날짜 입력 ──
+            print("\n[INFO] 재직 날짜 입력...")
+            # 이미 설정된 날짜 확인
+            date_els = page.locator('[class*="wds-92tzrw"]')
+            d_cnt = await date_els.count()
+            for i in range(d_cnt):
+                txt = await date_els.nth(i).inner_text()
+                if txt and 'YYYY' not in txt and '.' in txt:
+                    results['start_date'] = True
+                    print(f"[OK] 이미 날짜 설정됨: '{txt}'")
+                    break
 
-            date_inputs = await page.evaluate("""() => {
-                const result = [];
-                let idx = 0;
-                const inputs = document.querySelectorAll('input');
-                for (const inp of inputs) {
-                    const rect = inp.getBoundingClientRect();
-                    if (rect.width <= 0 || rect.height <= 0) { idx++; continue; }
-                    const ph = (inp.placeholder || '').toLowerCase();
-                    const type = inp.type || '';
-                    const id = inp.id.toLowerCase();
-                    const name = inp.name.toLowerCase();
-                    if (type === 'date' ||
-                        ph.includes('년') || ph.includes('월') ||
-                        ph.includes('yyyy') || ph.includes('yy') ||
-                        name.includes('date') || name.includes('year') ||
-                        id.includes('date') || id.includes('year') ||
-                        id.includes('start') || id.includes('end')) {
-                        result.push({
-                            type: type,
-                            placeholder: (inp.placeholder || '').substring(0, 60),
-                            id: inp.id.substring(0, 60),
-                            name: inp.name.substring(0, 60),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                            domIndex: idx,
+            if not results['start_date']:
+                date_btns = page.get_by_text('YYYY.MM', exact=True)
+                date_cnt = await date_btns.count()
+                print(f"[INFO] YYYY.MM 버튼 수: {date_cnt}")
+
+                if date_cnt >= 1:
+                    try:
+                        start_btn = date_btns.first
+                        await start_btn.scroll_into_view_if_needed()
+                        await start_btn.click(timeout=5000)
+                        await page.wait_for_timeout(1000)
+
+                        # 년도 선택
+                        year_clicked = False
+                        for yr in ['2022', '2021', '2023']:
+                            yr_btns = page.get_by_text(yr, exact=True)
+                            if await yr_btns.count() > 0:
+                                for i in range(await yr_btns.count()):
+                                    try:
+                                        b = yr_btns.nth(i)
+                                        if await b.is_visible():
+                                            await b.click(timeout=3000)
+                                            year_clicked = True
+                                            print(f"[OK] {yr} 클릭")
+                                            break
+                                    except Exception:
+                                        pass
+                            if year_clicked:
+                                break
+
+                        await page.wait_for_timeout(500)
+
+                        # 월 선택
+                        for mo in ['1월', '1']:
+                            mo_btns = page.get_by_text(mo, exact=True)
+                            if await mo_btns.count() > 0:
+                                for i in range(await mo_btns.count()):
+                                    try:
+                                        b = mo_btns.nth(i)
+                                        if await b.is_visible():
+                                            await b.click(timeout=3000)
+                                            print(f"[OK] 월 '{mo}' 클릭")
+                                            break
+                                    except Exception:
+                                        pass
+                                break
+
+                        await page.wait_for_timeout(300)
+
+                        # 확인
+                        for kw in ['확인', '적용']:
+                            try:
+                                btn = page.get_by_text(kw, exact=True)
+                                if await btn.count() > 0 and await btn.first.is_visible():
+                                    await btn.first.click(timeout=3000)
+                                    await page.wait_for_timeout(500)
+                                    results['start_date'] = True
+                                    print(f"[OK] '{kw}' - 날짜 설정 완료")
+                                    break
+                            except Exception:
+                                pass
+
+                        await page.keyboard.press('Escape')
+                        await page.wait_for_timeout(500)
+
+                    except Exception as e:
+                        print(f"[WARN] 날짜 피커 실패: {e}")
+
+            await page.wait_for_timeout(500)
+
+            # ── 3. 재직형태 선택 (Select_Select 커스텀 드롭다운) ──
+            print("\n[INFO] 재직형태 선택...")
+
+            # 재직 형태 Select 컴포넌트 찾기
+            # 클래스: Select_Select__fEsOi Select_Select_required__ExuC2
+            # 또는 class*="Select_Select" 내 class*="Select_required"
+            employ_select = page.locator('[class*="Select_Select__"]').first
+            es_cnt = await employ_select.count()
+            print(f"[INFO] Select_Select__ 컴포넌트 수: {es_cnt}")
+
+            if es_cnt > 0:
+                await employ_select.scroll_into_view_if_needed()
+                await page.wait_for_timeout(500)
+                print("[INFO] Select 컴포넌트 클릭...")
+                await employ_select.click(timeout=8000)
+                await page.wait_for_timeout(1000)
+
+                # 드롭다운 옵션 스캔
+                dropdown_scan = await page.evaluate("""() => {
+                    const res = [];
+                    const selectors = [
+                        '[role="option"]',
+                        '[role="listbox"] [class*="item"]',
+                        '[role="listbox"] li',
+                        '[role="menu"] li',
+                        '[class*="OptionItem"]',
+                        '[class*="optionItem"]',
+                        '[class*="SelectItem"]',
+                        '[class*="selectItem"]',
+                    ];
+                    for (const sel of selectors) {
+                        const items = [...document.querySelectorAll(sel)];
+                        const visible = items.filter(el => {
+                            const r = el.getBoundingClientRect();
+                            return r.width > 0 && r.height > 0;
                         });
-                    }
-                    idx++;
-                }
-                return result;
-            }""")
-
-            safe_print(f"[INFO] 날짜 관련 입력 요소 ({len(date_inputs)}개):")
-            for di in date_inputs:
-                safe_print(f"  - ({di['x']},{di['y']}) type='{di['type']}' placeholder='{di['placeholder']}' id='{di['id']}'")
-
-            if date_inputs:
-                try:
-                    di = date_inputs[0]
-                    if di['type'] == 'date':
-                        inp = page.locator("input[type='date']").first
-                        await inp.fill(f"{start_year}-{start_month}-01")
-                        inputs_filled['start_date'] = True
-                        safe_print(f"[OK] 시작일 입력 성공 (date type)")
-                    else:
-                        inp = page.locator('input').nth(di['domIndex'])
-                        if await inp.is_visible():
-                            await inp.fill(f"{start_year}.{start_month}")
-                            inputs_filled['start_date'] = True
-                            safe_print(f"[OK] 시작일 입력 성공")
-                except Exception as e:
-                    safe_print(f"[WARN] 시작일 입력 실패: {e}")
-
-                if len(date_inputs) > 1:
-                    try:
-                        di2 = date_inputs[1]
-                        if di2['type'] == 'date':
-                            inp2 = page.locator("input[type='date']").nth(1)
-                            await inp2.fill(f"{end_year}-{end_month}-01")
-                            inputs_filled['end_date'] = True
-                            safe_print(f"[OK] 종료일 입력 성공 (date type)")
-                        else:
-                            inp2 = page.locator('input').nth(di2['domIndex'])
-                            if await inp2.is_visible():
-                                await inp2.fill(f"{end_year}.{end_month}")
-                                inputs_filled['end_date'] = True
-                                safe_print(f"[OK] 종료일 입력 성공")
-                    except Exception as e:
-                        safe_print(f"[WARN] 종료일 입력 실패: {e}")
-
-            await page.wait_for_timeout(500)
-
-            # ── 8-3: 재직형태 선택 ──
-            safe_print("[INFO] 재직형태 입력 시도...")
-
-            if form_scan['selects']:
-                try:
-                    sel = page.locator('select').first
-                    if await sel.is_visible():
-                        await sel.select_option(label=employment_type)
-                        inputs_filled['employment_type'] = True
-                        safe_print(f"[OK] 재직형태 select 선택 성공: '{employment_type}'")
-                except Exception as e:
-                    safe_print(f"[WARN] select 선택 실패: {e}")
-
-            if not inputs_filled['employment_type']:
-                employ_kws = ['재직형태', '고용형태', '근무형태']
-                for kw in employ_kws:
-                    try:
-                        el = page.get_by_text(kw, exact=False).first
-                        if await el.count() > 0 and await el.is_visible():
-                            await el.click(timeout=5000)
-                            await page.wait_for_timeout(500)
-                            opt = page.get_by_text(employment_type, exact=True).first
-                            if await opt.count() > 0 and await opt.is_visible():
-                                await opt.click(timeout=5000)
-                                inputs_filled['employment_type'] = True
-                                safe_print(f"[OK] '{employment_type}' 선택 성공")
-                            break
-                    except Exception as e:
-                        safe_print(f"[WARN] '{kw}' 클릭 실패: {e}")
-
-            if not inputs_filled['employment_type']:
-                for kw in ['정규직', '풀타임']:
-                    try:
-                        el = page.get_by_text(kw, exact=True).first
-                        if await el.count() > 0 and await el.is_visible():
-                            await el.click(timeout=5000)
-                            inputs_filled['employment_type'] = True
-                            safe_print(f"[OK] '{kw}' 클릭 성공")
-                            break
-                    except Exception as e:
-                        safe_print(f"[WARN] '{kw}' 클릭 실패: {e}")
-
-            await page.wait_for_timeout(500)
-
-            # ── 8-4: 주요 성과 입력 ──
-            safe_print("[INFO] 주요 성과/상세 입력 시도...")
-
-            textareas = await page.evaluate("""() => {
-                const result = [];
-                const taEls = document.querySelectorAll('textarea');
-                let idx = 0;
-                for (const el of taEls) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        result.push({
-                            placeholder: (el.placeholder || '').substring(0, 100),
-                            id: el.id.substring(0, 60),
-                            x: Math.round(rect.left),
-                            y: Math.round(rect.top),
-                            domIndex: idx,
-                        });
-                    }
-                    idx++;
-                }
-                return result;
-            }""")
-
-            safe_print(f"[INFO] textarea 요소 ({len(textareas)}개):")
-            for ta in textareas:
-                safe_print(f"  - ({ta['x']},{ta['y']}) placeholder='{ta['placeholder']}' idx={ta['domIndex']}")
-
-            # 주요 성과
-            achievement_filled = False
-            achievement_detail_filled = False
-
-            achievement_kws = ['주요 성과', '성과', '업무 내용', '담당 업무', '업무내용',
-                               '성과 및 업무', '어떤 일을', '무슨 일을', '내용']
-            for kw in achievement_kws:
-                try:
-                    ta = page.locator(f'textarea[placeholder*="{kw}"]').first
-                    if await ta.count() > 0 and await ta.is_visible():
-                        await ta.click(timeout=5000)
-                        await ta.fill(achievement_title)
-                        achievement_filled = True
-                        inputs_filled['achievement'] = True
-                        safe_print(f"[OK] 주요 성과 textarea 입력 성공 (placeholder='{kw}')")
-                        break
-                except Exception:
-                    pass
-
-            if not achievement_filled:
-                for kw in achievement_kws:
-                    try:
-                        inp = page.locator(f'input[placeholder*="{kw}"]').first
-                        if await inp.count() > 0 and await inp.is_visible():
-                            await inp.click(timeout=5000)
-                            await inp.fill(achievement_title)
-                            achievement_filled = True
-                            inputs_filled['achievement'] = True
-                            safe_print(f"[OK] 주요 성과 input 입력 성공 (placeholder='{kw}')")
-                            break
-                    except Exception:
-                        pass
-
-            if not achievement_filled and textareas:
-                try:
-                    ta = page.locator('textarea').nth(textareas[0]['domIndex'])
-                    if await ta.is_visible():
-                        await ta.click(timeout=5000)
-                        await ta.fill(achievement_title)
-                        achievement_filled = True
-                        inputs_filled['achievement'] = True
-                        safe_print(f"[OK] 첫 번째 textarea에 주요 성과 입력 성공")
-                except Exception as e:
-                    safe_print(f"[WARN] 첫 번째 textarea 입력 실패: {e}")
-
-            await page.wait_for_timeout(500)
-
-            # 주요 성과 상세
-            detail_kws = ['성과 상세', '상세 내용', '상세내용', '구체적', '자세히',
-                          '업무 상세', '내용 입력', '설명', '어떤 성과']
-            for kw in detail_kws:
-                try:
-                    ta = page.locator(f'textarea[placeholder*="{kw}"]').first
-                    if await ta.count() > 0 and await ta.is_visible():
-                        await ta.click(timeout=5000)
-                        await ta.fill(achievement_detail)
-                        achievement_detail_filled = True
-                        inputs_filled['achievement_detail'] = True
-                        safe_print(f"[OK] 주요 성과 상세 textarea 입력 성공 (placeholder='{kw}')")
-                        break
-                except Exception:
-                    pass
-
-            if not achievement_detail_filled and len(textareas) > 1:
-                try:
-                    ta = page.locator('textarea').nth(textareas[1]['domIndex'])
-                    if await ta.is_visible():
-                        await ta.click(timeout=5000)
-                        await ta.fill(achievement_detail)
-                        achievement_detail_filled = True
-                        inputs_filled['achievement_detail'] = True
-                        safe_print(f"[OK] 두 번째 textarea에 주요 성과 상세 입력 성공")
-                except Exception as e:
-                    safe_print(f"[WARN] 두 번째 textarea 입력 실패: {e}")
-
-            # 현재 상태 종합 로그
-            safe_print(f"\n[INFO] 입력 현황:")
-            for k, v in inputs_filled.items():
-                safe_print(f"  - {k}: {'입력됨' if v else '미입력'}")
-
-            # ── Step 9: 입력 결과 검증 ──
-            safe_print("\n[INFO] 입력 결과 검증 중...")
-            verify_result = await page.evaluate("""(companyName) => {
-                const result = {
-                    bodyText: (document.body.innerText || '').replace(/\\s+/g, ' ').substring(0, 5000),
-                    hasCompanyName: false,
-                    allInputValues: [],
-                };
-
-                if (result.bodyText.includes(companyName)) {
-                    result.hasCompanyName = true;
-                }
-
-                const inputEls = document.querySelectorAll('input:not([type="hidden"]), textarea, [contenteditable="true"]');
-                for (const el of inputEls) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        const value = el.value || el.textContent || '';
-                        if (value.trim()) {
-                            result.allInputValues.push({
-                                tag: el.tagName,
-                                value: value.trim().substring(0, 100),
-                                placeholder: (el.placeholder || '').substring(0, 60),
+                        if (visible.length > 0) {
+                            visible.forEach(el => {
+                                const text = (el.innerText||'').trim().replace(/\\s+/g,' ');
+                                if (text.length > 0 && text.length < 60)
+                                    res.push({ text: text.slice(0,50), sel,
+                                        cls: (el.className||'').slice(0,60),
+                                        x: Math.round(el.getBoundingClientRect().left),
+                                        y: Math.round(el.getBoundingClientRect().top) });
                             });
+                            break;
                         }
                     }
-                }
+                    return res;
+                }""")
 
-                return result;
-            }""", company_name)
+                print(f"[INFO] 드롭다운 옵션 ({len(dropdown_scan)}개):")
+                for opt in dropdown_scan:
+                    print(f"  '{opt['text']}' ({opt['x']},{opt['y']}) sel={opt['sel']}")
 
-            safe_print(f"[INFO] 회사명 입력 확인: {verify_result['hasCompanyName']}")
-            safe_print(f"[INFO] 입력된 값들 ({len(verify_result['allInputValues'])}개):")
-            for inp in verify_result['allInputValues']:
-                safe_print(f"  - [{inp['tag']}] placeholder='{inp['placeholder']}' value='{inp['value']}'")
+                # 고용형태 옵션 선택 (드롭다운 열린 상태에서 클릭)
+                employ_choices = ['정규직', '계약직', '인턴', '파견직', '프리랜서']
 
-            # 검증: 적어도 일부 필드가 입력되었는지
-            has_any_input = len(verify_result['allInputValues']) > 0
-            assert has_any_input or inputs_filled['company'], \
-                "경력 항목에 아무것도 입력되지 않았습니다."
+                # JS로 직접 클릭 (가장 안정적)
+                clicked_by_js = await page.evaluate("""(choices) => {
+                    const options = [...document.querySelectorAll('[role="option"]')];
+                    for (const choice of choices) {
+                        const opt = options.find(el => {
+                            const r = el.getBoundingClientRect();
+                            return r.width > 0 && r.height > 0 && (el.innerText||'').trim() === choice;
+                        });
+                        if (opt) {
+                            opt.click();
+                            return choice;
+                        }
+                    }
+                    return null;
+                }""", employ_choices)
 
-            safe_print("[OK] 경력 항목 입력 완료!")
+                if clicked_by_js:
+                    results['employ_type'] = True
+                    print(f"[OK] 재직형태 '{clicked_by_js}' JS 클릭 완료")
+
+                # JS 실패 시 Playwright로 재시도
+                if not results['employ_type']:
+                    for choice in employ_choices:
+                        role_opts = page.locator('[role="option"]')
+                        cnt = await role_opts.count()
+                        for i in range(cnt):
+                            b = role_opts.nth(i)
+                            txt = (await b.inner_text()).strip()
+                            if txt == choice:
+                                try:
+                                    await b.click(force=True, timeout=5000)
+                                    results['employ_type'] = True
+                                    print(f"[OK] 재직형태 '{choice}' force 클릭 완료")
+                                    break
+                                except Exception as ce:
+                                    print(f"  force 클릭 실패: {ce}")
+                        if results['employ_type']:
+                            break
+
+                # 텍스트 방식 최종 폴백
+                if not results['employ_type']:
+                    for choice in employ_choices:
+                        el = page.get_by_text(choice, exact=True)
+                        for i in range(await el.count()):
+                            b = el.nth(i)
+                            if await b.is_visible():
+                                try:
+                                    await b.click(timeout=5000)
+                                    results['employ_type'] = True
+                                    print(f"[OK] 재직형태 '{choice}' 직접 선택")
+                                    break
+                                except Exception:
+                                    pass
+                        if results['employ_type']:
+                            break
+
+            await page.wait_for_timeout(500)
+
+            # 재직형태 여전히 실패시 CareerItem 내 Select 재시도
+            if not results['employ_type']:
+                print("[INFO] CareerItem 내 Select 재시도...")
+                career_selects = page.locator('[class*="CareerItem"] [class*="Select_Select"]')
+                cs_cnt = await career_selects.count()
+                print(f"[INFO] CareerItem > Select 수: {cs_cnt}")
+                if cs_cnt > 0:
+                    await career_selects.first.scroll_into_view_if_needed()
+                    await page.wait_for_timeout(500)
+                    await career_selects.first.click(timeout=8000)
+                    await page.wait_for_timeout(1000)
+
+                    for choice in ['정규직', '계약직', '인턴']:
+                        el = page.get_by_text(choice, exact=True)
+                        if await el.count() > 0:
+                            for i in range(await el.count()):
+                                b = el.nth(i)
+                                if await b.is_visible():
+                                    await b.click(timeout=5000)
+                                    results['employ_type'] = True
+                                    print(f"[OK] 재직형태 '{choice}' 재시도 성공")
+                                    break
+                        if results['employ_type']:
+                            break
+
+            await page.wait_for_timeout(500)
+
+            # ── 4. 주요 성과 입력 ──
+            print("\n[INFO] 주요 성과 입력...")
+            achieve_input = page.locator('input[placeholder*="주요 성과"]').first
+            if await achieve_input.count() > 0:
+                try:
+                    await achieve_input.scroll_into_view_if_needed()
+                    await page.wait_for_timeout(300)
+                    await achieve_input.fill(achievement_title)
+                    await page.wait_for_timeout(300)
+                    cur_val = await achieve_input.input_value()
+                    if cur_val:
+                        results['achievement'] = True
+                        print(f"[OK] 주요 성과 입력 완료: '{cur_val}'")
+                except Exception as e:
+                    print(f"[WARN] 주요 성과 입력 실패: {e}")
+
+            await page.wait_for_timeout(500)
+
+            # ── 5. 주요 성과 상세 입력 ──
+            print("\n[INFO] 주요 성과 상세 입력...")
+            detail_ta = page.locator('textarea[placeholder*="업무 경험"]').first
+            if await detail_ta.count() > 0:
+                try:
+                    await detail_ta.scroll_into_view_if_needed()
+                    await page.wait_for_timeout(500)
+                    await detail_ta.fill(achievement_detail)
+                    await page.wait_for_timeout(300)
+                    cur_val = await detail_ta.input_value()
+                    if cur_val:
+                        results['achievement_detail'] = True
+                        print(f"[OK] 주요 성과 상세 입력 완료")
+                except Exception as e:
+                    print(f"[WARN] 주요 성과 상세 1차 실패: {e}")
+                    try:
+                        handle = await detail_ta.element_handle()
+                        await page.evaluate("""([el, val]) => {
+                            const setter = Object.getOwnPropertyDescriptor(
+                                window.HTMLTextAreaElement.prototype, 'value').set;
+                            setter.call(el, val);
+                            el.dispatchEvent(new Event('input', {bubbles: true}));
+                            el.dispatchEvent(new Event('change', {bubbles: true}));
+                        }""", [handle, achievement_detail])
+                        await page.wait_for_timeout(300)
+                        cur_val = await detail_ta.input_value()
+                        if cur_val:
+                            results['achievement_detail'] = True
+                            print("[OK] JS로 주요 성과 상세 입력 완료")
+                    except Exception as e2:
+                        print(f"[WARN] JS 방식도 실패: {e2}")
+
+            await page.wait_for_timeout(1000)
+
+            # ── 6. 최종 검증 ──
+            print("\n[INFO] 최종 결과 요약:")
+            for k, v in results.items():
+                print(f"  {k}: {'✅' if v else '❌'}")
+
+            assert results['company'], "회사명 입력 실패"
+            assert results['start_date'], "재직 날짜 입력 실패"
+            assert results['employ_type'], "재직형태 선택 실패"
+            assert results['achievement'], "주요 성과 입력 실패"
+            assert results['achievement_detail'], "주요 성과 상세 입력 실패"
+
+            print("\n[OK] TC56 - 경력 항목 모두 입력 완료!")
 
             await page.screenshot(path='screenshots/test_56_success.png')
             print("AUTOMATION_SUCCESS")
@@ -658,7 +433,7 @@ async def test_main():
         except Exception as e:
             await page.screenshot(path='screenshots/test_56_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
-            return False
+            raise
 
         finally:
             await browser.close()

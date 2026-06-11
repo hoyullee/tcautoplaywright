@@ -29,53 +29,61 @@ async def test_main():
             os.makedirs('screenshots', exist_ok=True)
             os.makedirs('work', exist_ok=True)
 
-            print("[INFO] 페이지 접속: https://www.wanted.co.kr/")
+            # 1. 채용 홈 진입
+            print("[INFO] 채용 홈 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('load')
             await page.wait_for_timeout(3000)
-            print("[OK] 페이지 로드 완료")
+            print("[OK] 채용 홈 로드 완료")
 
             title = await page.title()
             print(f"[INFO] 페이지 타이틀: {title}")
-            assert 'ERROR' not in title, f"페이지 로드 실패: {title}"
+            assert 'ERROR' not in title.upper(), f"페이지 로드 실패: {title}"
 
-            # 1. GNB 영역 확인
+            # 2. GNB 영역 확인
             print("[INFO] GNB 영역 확인 중...")
-            await page.screenshot(path='screenshots/test_1_step1.png')
-
             gnb_visible = False
             for sel in [
-                'a[href="https://www.wanted.co.kr/wdlist"]',
-                'a:has-text("채용")',
                 'header',
                 'nav',
+                'a[href="https://www.wanted.co.kr/wdlist"]',
+                'a:has-text("채용")',
             ]:
                 count = await page.locator(sel).count()
                 if count > 0:
                     print(f"[OK] GNB 확인됨 (셀렉터: {sel})")
                     gnb_visible = True
                     break
-
             assert gnb_visible, "GNB 영역을 찾을 수 없습니다"
 
-            # 2. 회원가입/로그인 버튼 클릭
+            # 3. 회원가입/로그인 버튼 클릭
             print("[INFO] 회원가입/로그인 버튼 클릭 중...")
-            clicked = await page.evaluate("""() => {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const loginBtn = buttons.find(b =>
-                    b.innerText.includes('회원가입') ||
-                    b.innerText.includes('로그인')
-                );
-                if (loginBtn) {
-                    loginBtn.click();
-                    return loginBtn.innerText.trim();
-                }
-                return null;
-            }""")
-            assert clicked is not None, "회원가입/로그인 버튼을 찾을 수 없습니다"
-            print(f"[OK] 버튼 클릭됨: {clicked}")
+            login_btn = page.get_by_role('button', name='회원가입/로그인')
+            btn_count = await login_btn.count()
 
-            # 로그인 페이지 진입 확인
+            if btn_count == 0:
+                # fallback: 텍스트로 탐색
+                login_btn = page.get_by_text('회원가입/로그인').first
+                btn_count = await login_btn.count()
+
+            if btn_count == 0:
+                # fallback: JS로 클릭
+                clicked = await page.evaluate("""() => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b =>
+                        b.innerText.includes('회원가입') ||
+                        b.innerText.includes('로그인')
+                    );
+                    if (btn) { btn.click(); return btn.innerText.trim(); }
+                    return null;
+                }""")
+                assert clicked is not None, "회원가입/로그인 버튼을 찾을 수 없습니다"
+                print(f"[OK] JS 클릭으로 버튼 클릭됨: {clicked}")
+            else:
+                await login_btn.click()
+                print("[OK] 회원가입/로그인 버튼 클릭 완료")
+
+            # 4. 로그인 페이지 진입 확인
             await page.wait_for_url('**/login**', timeout=15000)
             await page.wait_for_load_state('load')
             await page.wait_for_timeout(2000)
@@ -84,56 +92,53 @@ async def test_main():
             assert 'login' in current_url, f"로그인 페이지로 이동하지 않음: {current_url}"
             print("[OK] 회원가입/로그인 페이지 정상 진입 확인")
 
-            await page.screenshot(path='screenshots/test_1_login_page.png')
-
-            # 3. 이메일로 계속하기 클릭
-            print("[INFO] '이메일로 계속하기' 버튼 클릭...")
-            email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
+            # 5. 이메일로 시작하기 (또는 이메일로 계속하기)
+            print("[INFO] '이메일로 시작하기' 버튼 클릭...")
+            email_continue_btn = page.get_by_role('button', name='이메일로 시작하기')
+            btn_cnt = await email_continue_btn.count()
+            if btn_cnt == 0:
+                email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
             await email_continue_btn.wait_for(timeout=10000)
             await email_continue_btn.click()
             await page.wait_for_timeout(2000)
             print("[OK] 이메일 로그인 폼 진입 완료")
 
-            # 4. 이메일 입력
+            # 6. 이메일 입력
             print("[INFO] 이메일 입력 중...")
             email_input = page.locator('#email, input[type="email"], input[name="email"]').first
             await email_input.wait_for(timeout=10000)
             await email_input.fill(TEST_EMAIL)
             print("[OK] 이메일 입력 완료")
 
-            # 5. 비밀번호 입력
+            # 7. 비밀번호 입력
             password_input = page.locator('input[type="password"]').first
             await password_input.fill(TEST_PASSWORD)
             print("[OK] 비밀번호 입력 완료")
 
-            # 6. 로그인 버튼 클릭
+            # 8. 로그인 버튼 클릭
             submit_btn = page.get_by_role('button', name='로그인')
             await submit_btn.click()
             print("[OK] 로그인 제출 완료")
 
-            # 7. 로그인 후 리다이렉트 확인
+            # 9. 로그인 후 리다이렉트 확인
             await page.wait_for_load_state('load', timeout=20000)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
             final_url = page.url
             print(f"[OK] 로그인 후 URL: {final_url}")
+            assert 'login' not in final_url, f"로그인 실패, 여전히 로그인 페이지: {final_url}"
 
-            # 세션 저장
+            # 10. 세션 저장
             await context.storage_state(path='work/auth_state.json')
-            print("[OK] 로그인 세션 저장 완료")
+            print("[OK] 로그인 세션 저장 완료: work/auth_state.json")
 
-            await page.screenshot(path='screenshots/test_1_success.png')
-            print("[OK] 테스트 성공")
+            await page.screenshot(path='screenshots/test_01_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            try:
-                await page.screenshot(path='screenshots/test_1_failed.png')
-            except Exception:
-                pass
-            print(f"[FAIL] 테스트 실패: {e}")
+            await page.screenshot(path='screenshots/test_01_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
-            return False
+            raise
 
         finally:
             await browser.close()

@@ -98,21 +98,21 @@ async def test_main():
 
             await page.screenshot(path='screenshots/test_27_step2_login_page.png')
 
-            # 4. '이메일로 계속하기' 버튼 탐색 및 클릭
-            print("[INFO] '이메일로 계속하기' 버튼 탐색 중...")
+            # 4. '이메일로 시작하기' 버튼 탐색 및 클릭
+            print("[INFO] '이메일로 시작하기' 버튼 탐색 중...")
             email_continue_btn = None
             continue_selectors = [
-                page.get_by_role('button', name='이메일로 계속하기'),
-                page.locator('button:has-text("이메일로 계속하기")').first,
+                page.get_by_role('button', name='이메일로 시작하기'),
+                page.locator('button:has-text("이메일로 시작하기")').first,
                 page.locator('button:has-text("이메일")').first,
                 page.locator('[class*="email"]:has-text("계속")').first,
-                page.locator('text=이메일로 계속하기').first,
+                page.locator('text=이메일로 시작하기').first,
             ]
             for sel in continue_selectors:
                 try:
                     await sel.wait_for(timeout=5000, state='visible')
                     email_continue_btn = sel
-                    print("[OK] '이메일로 계속하기' 버튼 발견")
+                    print("[OK] '이메일로 시작하기' 버튼 발견")
                     break
                 except Exception:
                     continue
@@ -120,10 +120,10 @@ async def test_main():
             if email_continue_btn is not None:
                 await email_continue_btn.click()
                 await page.wait_for_timeout(2000)
-                print("[OK] '이메일로 계속하기' 클릭 완료")
+                print("[OK] '이메일로 시작하기' 클릭 완료")
                 await page.screenshot(path='screenshots/test_27_step3_email_continue.png')
             else:
-                print("[WARN] '이메일로 계속하기' 버튼 없음. 이메일 입력 필드 직접 탐색...")
+                print("[WARN] '이메일로 시작하기' 버튼 없음. 이메일 입력 필드 직접 탐색...")
 
             # 5. 이메일 입력
             print("[INFO] 이메일 입력 중...")

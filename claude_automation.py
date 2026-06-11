@@ -7,7 +7,6 @@ import time
 import logging
 import argparse
 from pathlib import Path
-from datetime import datetime
 from dotenv import load_dotenv
 
 if sys.stdout.encoding != 'utf-8':
@@ -18,18 +17,14 @@ if sys.stderr.encoding != 'utf-8':
 load_dotenv()  # .env 파일 로드
 
 # ========== 디렉토리 생성 ==========
-for dir_name in ['test', 'test_results', 'screenshots', 'logs', 'work']:  # ⭐ test_results 추가
+for dir_name in ['test', 'screenshots', 'work']:
     Path(dir_name).mkdir(exist_ok=True)
 
 # ========== 로깅 설정 ==========
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(f'logs/test_{timestamp}.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 
 AUTH_STATE_FILE = 'work/auth_state.json'
@@ -71,6 +66,53 @@ def create_claude_prompt(test_case):
     # 로그인 계정 정보 (로그인 수행 케이스에만)
     login_info = f"테스트 계정 — 이메일: {test_email} / 비밀번호: {test_password}" if (save_session and test_email) else ""
 
+    # 이력서 진입 코드 스니펫 주입
+    # 사전조건이 "이력서 작성 페이지 진입 상태"이고 "기본 이력서"가 없으면 비기본 이력서 선택 코드 삽입
+    precondition = test_case.get('사전조건', '')
+    needs_non_basic_resume = '이력서 작성 페이지 진입 상태' in precondition and '기본 이력서' not in precondition
+    resume_entry_snippet = f"""
+## 이력서 진입 코드 (반드시 아래 코드를 그대로 복사해서 사용할 것)
+
+사전조건의 "이력서 작성 페이지 진입"은 아래 코드로 구현합니다.
+절대로 cv/edit, cv/new, cv/create, cv/write 링크를 직접 탐색하지 마세요.
+절대로 "새 이력서 작성" 버튼을 먼저 클릭하지 마세요.
+
+```python
+# 이력서 목록 페이지 진입
+await page.goto('https://www.wanted.co.kr/cv/list', timeout=60000)
+await page.wait_for_load_state('domcontentloaded')
+await page.wait_for_timeout(3000)
+assert 'cv/list' in page.url, f"이력서 목록 페이지 진입 실패: {{page.url}}"
+
+# 최상위 이력서 카드만 선택 (:has로 하위 요소 제외)
+# 기본 이력서는 항상 index 0이므로 index 1(두 번째 카드)이 첫 번째 비기본 이력서
+all_cards = page.locator('[class*="ResumeItem_ResumeItem"]:has([class*="__title__"])')
+total = await all_cards.count()
+
+# 비기본 이력서(index 1 이상)가 없으면 새 이력서 생성
+if total < 2:
+    for kw in ['새 이력서 작성', '새 이력서']:
+        btn = page.get_by_text(kw, exact=False)
+        if await btn.count() > 0:
+            await btn.first.click()
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(3000)
+            await page.goto('https://www.wanted.co.kr/cv/list', timeout=30000)
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(3000)
+            break
+    total = await all_cards.count()
+
+assert total >= 2, "기본 이력서 외 이력서 카드가 없습니다"
+
+# index 0 = 기본 이력서, index 1 = 첫 번째 비기본 이력서
+await all_cards.nth(1).click()
+await page.wait_for_load_state('domcontentloaded')
+await page.wait_for_timeout(3000)
+assert '/cv/' in page.url and 'cv/list' not in page.url, f"이력서 편집 페이지 진입 실패: {{page.url}}"
+```
+""" if needs_non_basic_resume else ""
+
     prompt = f"""## 테스트 케이스 정보
 - 번호: {test_no}
 - 환경: {test_case.get('환경', 'PC')}
@@ -80,7 +122,7 @@ def create_claude_prompt(test_case):
 - 기대결과: {test_case.get('기대결과', '')}
 {f'- {login_info}' if login_info else ''}
 {f'- 세션: {session_instruction}' if session_instruction else ''}
-
+{resume_entry_snippet}
 ## 작업
 1. `test/test_{test_no_str}_working.py` 생성 후 코드 작성
 2. `python3 test/test_{test_no_str}_working.py` 실행
@@ -107,10 +149,6 @@ def run_claude_code(prompt, test_no, max_attempts=3):
         logging.info(f"🤖 Claude Code 실행 시도 {attempt}/{max_attempts}")
 
         try:
-            prompt_file = f'work/test_{test_no_str}_prompt.txt'
-            with open(prompt_file, 'w', encoding='utf-8') as f:
-                f.write(prompt)
-
             result = subprocess.run(
                 [
                     'claude',
@@ -130,17 +168,6 @@ def run_claude_code(prompt, test_no, max_attempts=3):
             )
 
             output = result.stdout
-            error = result.stderr
-
-            # 로그 저장
-            log_file = f'work/test_{test_no_str}_attempt_{attempt}.log'
-            with open(log_file, 'w', encoding='utf-8') as f:
-                f.write(f"=== 실행 시간 ===\n{datetime.now()}\n\n")
-                f.write(f"=== 종료 코드 ===\n{result.returncode}\n\n")
-                f.write(f"=== 출력 ===\n{output}\n\n")
-                f.write(f"=== 에러 ===\n{error}\n")
-
-            logging.info(f"📄 로그: {log_file}")
 
             if result.returncode != 0:
                 logging.warning(f"⚠️ 종료 코드: {result.returncode}")
@@ -246,9 +273,7 @@ def main():
         results.append({
             'test_no': test_no,
             'status': 'SUCCESS' if success else 'FAILED',
-            'test_case': test_case,
             'error': error,
-            'timestamp': datetime.now().isoformat()
         })
 
         print(f"{'✅ 성공!' if success else '❌ 실패!'}")
@@ -266,29 +291,17 @@ def main():
         if idx < len(test_cases):
             time.sleep(2)
     
-    # ⭐ 결과 JSON 저장
-    result_file = f'test_results/result_{timestamp}.json'
-    with open(result_file, 'w', encoding='utf-8') as f:
-        json.dump({
-            'timestamp': timestamp,
-            'total': len(test_cases),
-            'success': sum(1 for r in results if r['status'] == 'SUCCESS'),
-            'failed': sum(1 for r in results if r['status'] == 'FAILED'),
-            'results': results
-        }, f, indent=2, ensure_ascii=False)
-    
     # 최종 리포트
     print(f"\n{'='*60}")
     print("📊 최종 결과")
     print("="*60)
-    
+
     success_count = sum(1 for r in results if r['status'] == 'SUCCESS')
     total = len(test_cases)
-    
+
     print(f"\n총 {total}개")
     print(f"✅ 성공: {success_count}개")
     print(f"❌ 실패: {total - success_count}개")
-    print(f"\n📄 결과: {result_file}")
 
 if __name__ == '__main__':
     main()

@@ -29,7 +29,7 @@ async def test_main():
             os.makedirs('screenshots', exist_ok=True)
             os.makedirs('work', exist_ok=True)
 
-            # 채용 홈 접속 후 로그인 버튼 클릭으로 로그인 페이지 진입
+            # 사전조건: 채용 홈 접속 후 이메일 로그인 페이지 진입
             print("[INFO] 채용 홈 접속: https://www.wanted.co.kr/")
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('load')
@@ -53,15 +53,13 @@ async def test_main():
             await page.wait_for_timeout(2000)
             print(f"[OK] 로그인 페이지 진입: {page.url}")
 
-            # 사전조건: 이메일로 로그인 페이지 진입 - '이메일로 계속하기' 클릭
-            print("[INFO] '이메일로 계속하기' 버튼 클릭...")
-            email_continue_btn = page.get_by_role('button', name='이메일로 계속하기')
+            # 사전조건: 이메일로 로그인 페이지 진입 - '이메일로 시작하기' 클릭
+            print("[INFO] '이메일로 시작하기' 버튼 클릭...")
+            email_continue_btn = page.get_by_role('button', name='이메일로 시작하기')
             await email_continue_btn.wait_for(timeout=10000)
             await email_continue_btn.click()
             await page.wait_for_timeout(2000)
             print("[OK] 이메일 로그인 폼 진입 완료")
-
-            await page.screenshot(path='screenshots/test_3_step1.png')
 
             # 확인사항 1: 이메일 입력
             print("[INFO] 이메일 입력 중...")
@@ -76,8 +74,6 @@ async def test_main():
             await password_input.wait_for(timeout=10000)
             await password_input.fill(TEST_PASSWORD)
             print("[OK] 비밀번호 입력 완료")
-
-            await page.screenshot(path='screenshots/test_3_step2.png')
 
             # 확인사항 2: 로그인 버튼 선택
             print("[INFO] 로그인 버튼 클릭...")
@@ -99,21 +95,16 @@ async def test_main():
 
             # 로그인 세션 저장
             await context.storage_state(path='work/auth_state.json')
-            print("[OK] 로그인 세션 저장 완료")
+            print("[OK] 로그인 세션 저장 완료: work/auth_state.json")
 
-            await page.screenshot(path='screenshots/test_3_success.png')
-            print("[OK] 테스트 성공")
+            await page.screenshot(path='screenshots/test_03_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            try:
-                await page.screenshot(path='screenshots/test_3_failed.png')
-            except Exception:
-                pass
-            print(f"[FAIL] 테스트 실패: {e}")
+            await page.screenshot(path='screenshots/test_03_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
-            return False
+            raise  # pytest가 FAILED로 인식하도록 반드시 re-raise
 
         finally:
             await browser.close()

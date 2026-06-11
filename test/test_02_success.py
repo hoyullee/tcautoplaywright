@@ -34,10 +34,10 @@ async def test_main():
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('load')
             await page.wait_for_timeout(3000)
-            print("[OK] 페이지 로드 완료")
+            print(f"[OK] 페이지 로드 완료: {page.url}")
 
             # GNB 로그인 버튼 클릭하여 로그인 페이지 진입
-            print("[INFO] 회원가입/로그인 버튼 클릭...")
+            print("[INFO] GNB 로그인 버튼 클릭...")
             clicked = await page.evaluate("""() => {
                 const buttons = Array.from(document.querySelectorAll('button'));
                 const loginBtn = buttons.find(b =>
@@ -51,30 +51,34 @@ async def test_main():
                 return null;
             }""")
             assert clicked is not None, "회원가입/로그인 버튼을 찾을 수 없습니다"
-            print(f"[OK] 버튼 클릭됨: {clicked}")
+            print(f"[OK] GNB 버튼 클릭됨: {clicked}")
 
             await page.wait_for_url('**/login**', timeout=15000)
             await page.wait_for_load_state('load')
             await page.wait_for_timeout(2000)
             print(f"[OK] 로그인 페이지 진입: {page.url}")
-            await page.screenshot(path='screenshots/test_2_step1_login_page.png')
 
-            # [확인사항] 이메일로 계속하기 버튼 선택
-            print("[INFO] '이메일로 계속하기' 버튼 클릭...")
-            email_btn = page.get_by_role('button', name='이메일로 계속하기')
-            await email_btn.wait_for(timeout=10000)
-            await email_btn.click()
+            # [확인사항] 이메일로 시작하기 버튼 선택
+            print("[INFO] '이메일로 시작하기' 버튼 클릭...")
+            # 버튼 텍스트는 '이메일로 시작하기' 또는 '이메일로 계속하기'일 수 있음
+            email_start_btn = page.get_by_role('button', name='이메일로 시작하기')
+            try:
+                await email_start_btn.wait_for(state='visible', timeout=5000)
+            except Exception:
+                # 다른 텍스트 시도
+                email_start_btn = page.get_by_role('button', name='이메일로 계속하기')
+                await email_start_btn.wait_for(state='visible', timeout=5000)
+
+            await email_start_btn.click()
             await page.wait_for_timeout(2000)
-            print("[OK] '이메일로 계속하기' 버튼 클릭 완료")
+            print("[OK] 이메일로 시작하기 버튼 클릭 완료")
 
             # [기대결과] 이메일로 로그인 페이지 진입 확인
-            print("[INFO] 이메일 로그인 폼 확인 중...")
-            await page.screenshot(path='screenshots/test_2_step2_email_form.png')
-
+            print("[INFO] 이메일 입력 필드 확인 중...")
             email_input = page.locator('#email, input[type="email"], input[name="email"]').first
-            await email_input.wait_for(timeout=10000)
+            await email_input.wait_for(state='visible', timeout=10000)
             assert await email_input.is_visible(), "이메일 입력 필드가 보이지 않습니다"
-            print("[OK] 이메일 입력 필드 확인 완료 - 이메일 로그인 페이지 진입 확인")
+            print("[OK] 이메일 입력 필드 확인 - 이메일 로그인 페이지 진입 확인")
 
             # 로그인 완료 후 세션 저장
             print("[INFO] 이메일/비밀번호 입력 및 로그인...")
@@ -89,25 +93,20 @@ async def test_main():
             print("[OK] 로그인 제출")
 
             await page.wait_for_load_state('load', timeout=20000)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
             print(f"[OK] 로그인 후 URL: {page.url}")
 
             await context.storage_state(path='work/auth_state.json')
-            print("[OK] 로그인 세션 저장 완료")
+            print("[OK] 로그인 세션 저장 완료: work/auth_state.json")
 
-            await page.screenshot(path='screenshots/test_2_success.png')
-            print("[OK] 테스트 성공")
+            await page.screenshot(path='screenshots/test_02_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            try:
-                await page.screenshot(path='screenshots/test_2_failed.png')
-            except Exception:
-                pass
-            print(f"[FAIL] 테스트 실패: {e}")
+            await page.screenshot(path='screenshots/test_02_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
-            return False
+            raise
 
         finally:
             await browser.close()

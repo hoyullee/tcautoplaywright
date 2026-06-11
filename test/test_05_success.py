@@ -20,7 +20,7 @@ async def do_login(page, context):
     await page.wait_for_timeout(2000)
 
     try:
-        email_btn = page.get_by_role('button', name='이메일로 계속하기')
+        email_btn = page.get_by_role('button', name='이메일로 시작하기')
         await email_btn.wait_for(timeout=8000)
         await email_btn.click()
         await page.wait_for_timeout(2000)
