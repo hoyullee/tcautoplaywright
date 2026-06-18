@@ -108,10 +108,9 @@ def main():
     print("\n📊 생성된 파일:")
     
     summary = {
-        'test': list(Path('test').glob('*.py')),
+        'test': list(Path('test').glob('**/*.py')),
         'screenshots': list(Path('screenshots').glob('*.png')),
-        'test_results': list(Path('test_results').glob('*.json')),
-        'logs': list(Path('logs').glob('*.log'))
+        'logs': list(Path('logs').glob('*.log')),
     }
     
     for folder, files in summary.items():

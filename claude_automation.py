@@ -44,13 +44,25 @@ def is_login_action_test(test_case):
         ('로그인' in expected or '로그인 버튼' in checks)
     )
 
+def get_test_path_info(test_case):
+    """TestCaseID로부터 (폴더명, 파일명 stem) 반환
+    예) TestCaseID='RESUME-006' → ('RESUME', 'test_RESUME_006')
+    """
+    tc_id = test_case.get('TestCaseID', '')
+    if tc_id and '-' in tc_id:
+        prefix, num = tc_id.rsplit('-', 1)
+        return prefix, f'test_{prefix}_{num}'
+    # fallback: NO 번호
+    no = str(test_case.get('NO', 0)).zfill(3)
+    return 'MISC', f'test_MISC_{no}'
+
 def create_claude_prompt(test_case):
     """Claude Code에 전달할 프롬프트 (TC 고유 정보만 포함, 정적 내용은 system_prompt.txt로 분리)"""
 
     test_email = os.getenv('WANTED_TEST_EMAIL', '')
     test_password = os.getenv('WANTED_TEST_PASSWORD', '')
     test_no = test_case.get('NO', '')
-    test_no_str = str(test_no).zfill(2)  # 01, 02 ... 10, 11 형식
+    folder, stem = get_test_path_info(test_case)
 
     use_saved_session = is_login_precondition(test_case)
     save_session = is_login_action_test(test_case)
@@ -115,7 +127,7 @@ assert '/cv/' in page.url and 'cv/list' not in page.url, f"이력서 편집 페�
 
     prompt = f"""## 테스트 케이스 정보
 - 번호: {test_no}
-- 환경: {test_case.get('환경', 'PC')}
+- TestCase ID: {test_case.get('TestCaseID', '')}
 - 기능영역: {test_case.get('기능영역', '')}
 - 사전조건: {test_case.get('사전조건', '없음')}
 - 확인사항: {test_case.get('확인사항', '')}
@@ -124,9 +136,9 @@ assert '/cv/' in page.url and 'cv/list' not in page.url, f"이력서 편집 페�
 {f'- 세션: {session_instruction}' if session_instruction else ''}
 {resume_entry_snippet}
 ## 작업
-1. `test/test_{test_no_str}_working.py` 생성 후 코드 작성
-2. `python3 test/test_{test_no_str}_working.py` 실행
-3. 성공 시 `test/test_{test_no_str}_success.py`로 이름 변경, 실패 시 수정 후 재시도
+1. `test/{folder}/{stem}_success.py` 파일에 코드 작성
+2. `python3 test/{folder}/{stem}_success.py` 실행
+3. 실패 시 코드 수정 후 재시도 (파일명 변경 없이 덮어쓰기)
 4. 마지막에 반드시 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
 
 지금 바로 시작하세요!
@@ -139,14 +151,25 @@ def load_system_prompt():
     with open('system_prompt.txt', 'r', encoding='utf-8') as f:
         return f.read()
 
-def run_claude_code(prompt, test_no, max_attempts=3):
+def _cleanup_temp_files(test_dir, stem):
+    """_success.py / _failed.py 외 동일 stem의 임시 파일 삭제 (예: _debug.py, _debug2.py)"""
+    keep = {f'{stem}_success.py', f'{stem}_failed.py'}
+    for f in test_dir.glob(f'{stem}_*.py'):
+        if f.name not in keep:
+            f.unlink()
+            logging.info(f"🗑️  임시 파일 삭제: {f.name}")
+
+def run_claude_code(prompt, test_case, max_attempts=3):
     """Claude Code 실행"""
 
     system_prompt = load_system_prompt()
-    test_no_str = str(test_no).zfill(2)
+    tc_id = test_case.get('TestCaseID', '') or f"NO{test_case.get('NO', '?')}"
+    folder, stem = get_test_path_info(test_case)
+    test_dir = Path('test') / folder
+    test_dir.mkdir(parents=True, exist_ok=True)
 
     for attempt in range(1, max_attempts + 1):
-        logging.info(f"🤖 Claude Code 실행 시도 {attempt}/{max_attempts}")
+        logging.info(f"🤖 [{tc_id}] 실행 시도 {attempt}/{max_attempts}")
 
         try:
             result = subprocess.run(
@@ -172,63 +195,65 @@ def run_claude_code(prompt, test_no, max_attempts=3):
             if result.returncode != 0:
                 logging.warning(f"⚠️ 종료 코드: {result.returncode}")
 
-            # 성공 확인
-            success_file = f'test/test_{test_no_str}_success.py'
-            working_file = f'test/test_{test_no_str}_working.py'
-            screenshot = f'screenshots/test_{test_no_str}_success.png'
+            success_file = test_dir / f'{stem}_success.py'
+            failed_file  = test_dir / f'{stem}_failed.py'
+            screenshot   = Path('screenshots') / f'{stem}_success.png'
 
-            # working 파일 확인 및 처리
-            if os.path.exists(working_file):
-                logging.info(f"📝 작업 파일 발견: {working_file}")
-                try:
-                    shutil.move(working_file, success_file)
-                    logging.info(f"✅ 파일명 변경: {success_file}")
-                except Exception as e:
-                    logging.warning(f"⚠️ 파일명 변경 실패: {e}")
+            # Claude가 잘못된 경로에 파일을 생성한 경우 올바른 위치로 이동
+            for misplaced in Path('test').rglob(f'{stem}_success.py'):
+                if misplaced.resolve() != success_file.resolve():
+                    shutil.move(str(misplaced), str(success_file))
+                    logging.info(f"📦 파일 위치 정정: {misplaced} → {success_file}")
+                    break
 
-            if 'AUTOMATION_SUCCESS' in output or os.path.exists(success_file) or os.path.exists(screenshot):
-                # 이전 시도에서 생성된 실패 스크린샷 삭제 (성공 스크린샷으로 대체)
-                failed_screenshot = f'screenshots/test_{test_no_str}_failed.png'
-                if os.path.exists(failed_screenshot):
-                    os.remove(failed_screenshot)
-                    logging.info(f"🗑️ 실패 스크린샷 삭제: {failed_screenshot}")
-                logging.info(f"✅ 테스트 {test_no} 성공!")
+            if 'AUTOMATION_SUCCESS' in output or success_file.exists() or screenshot.exists():
+                # 이전 실패 파일 및 중간 디버그 파일 정리
+                if failed_file.exists():
+                    failed_file.unlink()
+                _cleanup_temp_files(test_dir, stem)
+                logging.info(f"✅ [{tc_id}] 성공!")
                 return True, output, None
 
             elif 'AUTOMATION_FAILED:' in output:
                 error_msg = output.split('AUTOMATION_FAILED:')[1].split('\n')[0].strip()
-                logging.warning(f"❌ 테스트 {test_no} 실패: {error_msg}")
-                
+                logging.warning(f"❌ [{tc_id}] 실패: {error_msg}")
                 if attempt < max_attempts:
                     logging.info("🔄 재시도...")
                     time.sleep(5)
                 else:
+                    # 마지막 시도 실패 → success.py를 failed.py로 보존
+                    if success_file.exists():
+                        shutil.move(str(success_file), str(failed_file))
+                        logging.info(f"📄 실패 코드 보존: {failed_file}")
                     return False, output, error_msg
-            
+
             else:
                 logging.warning(f"⚠️ 결과 불명확")
                 if attempt < max_attempts:
                     time.sleep(5)
                 else:
+                    if success_file.exists():
+                        shutil.move(str(success_file), str(failed_file))
+                        logging.info(f"📄 실패 코드 보존: {failed_file}")
                     return False, output, "결과 불명확"
-                    
+
         except subprocess.TimeoutExpired:
-            logging.warning(f"⏱️ 타임아웃 (5분)")
+            logging.warning(f"⏱️ [{tc_id}] 타임아웃")
             if attempt >= max_attempts:
-                return False, None, "타임아웃 (10분)"
-                
+                return False, None, "타임아웃"
+
         except Exception as e:
             logging.error(f"⚠️ 예외: {e}")
             if attempt >= max_attempts:
                 return False, None, str(e)
-    
+
     return False, None, "최대 재시도 횟수 초과"
 
 def main():
     """메인 함수"""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test-no', type=int, default=None, help='실행할 테스트 케이스 번호 (예: --test-no 4)')
+    parser.add_argument('--tc', type=str, default=None, help='실행할 TestCaseID (예: --tc RESUME-006)')
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
@@ -245,47 +270,54 @@ def main():
         all_test_cases = json.load(f)
 
     # 특정 케이스만 필터링
-    if args.test_no is not None:
-        test_cases = [tc for tc in all_test_cases if tc.get('NO') == args.test_no]
+    if args.tc is not None:
+        test_cases = [tc for tc in all_test_cases if tc.get('TestCaseID') == args.tc]
         if not test_cases:
-            logging.error(f"❌ NO:{args.test_no} 테스트 케이스를 찾을 수 없습니다!")
+            logging.error(f"❌ TestCaseID '{args.tc}'를 찾을 수 없습니다!")
             return
-        logging.info(f"🎯 NO:{args.test_no} 단일 테스트 실행")
+        logging.info(f"🎯 {args.tc} 단일 테스트 실행")
     else:
         test_cases = all_test_cases
         logging.info(f"📋 총 {len(test_cases)}개 테스트")
 
-    # TC #3 (로그인 세션 복원용) 미리 확보
-    login_tc = next((tc for tc in all_test_cases if tc.get('NO') == 3), None)
+    # LOGIN-003 (로그인 세션 복원용) 미리 확보
+    login_tc = next((tc for tc in all_test_cases if tc.get('TestCaseID') == 'LOGIN-003'), None)
 
     results = []
 
     for idx, test_case in enumerate(test_cases, 1):
-        test_no = test_case.get('NO', idx)
+        tc_id = test_case.get('TestCaseID', f"NO{test_case.get('NO', idx)}")
+        folder, stem = get_test_path_info(test_case)
+        success_file = Path('test') / folder / f'{stem}_success.py'
 
         print(f"\n{'='*60}")
-        print(f"📝 테스트 {idx}/{len(test_cases)}: TC #{test_no}")
+        print(f"📝 테스트 {idx}/{len(test_cases)}: {tc_id}")
         print("="*60)
 
+        if success_file.exists() and args.tc is None:
+            print(f"⏭️  이미 생성됨, 스킵")
+            results.append({'tc_id': tc_id, 'status': 'SKIPPED', 'error': None})
+            continue
+
         prompt = create_claude_prompt(test_case)
-        success, _, error = run_claude_code(prompt, test_no, max_attempts=3)
+        success, _, error = run_claude_code(prompt, test_case, max_attempts=3)
 
         results.append({
-            'test_no': test_no,
+            'tc_id': tc_id,
             'status': 'SUCCESS' if success else 'FAILED',
             'error': error,
         })
 
         print(f"{'✅ 성공!' if success else '❌ 실패!'}")
 
-        # TC #5(로그아웃) 완료 후 TC #3(로그인)으로 세션 복원
-        if test_no == 5 and login_tc is not None:
+        # LOGIN-005(로그아웃) 완료 후 LOGIN-003(로그인)으로 세션 복원
+        if tc_id == 'LOGIN-005' and login_tc is not None:
             print(f"\n{'='*60}")
-            print(f"🔄 TC #5 로그아웃 완료 → TC #3 재실행으로 세션 복원")
+            print(f"🔄 LOGIN-005 로그아웃 완료 → LOGIN-003 재실행으로 세션 복원")
             print("="*60)
             time.sleep(2)
             login_prompt = create_claude_prompt(login_tc)
-            login_success, _, login_error = run_claude_code(login_prompt, 3, max_attempts=3)
+            login_success, _, login_error = run_claude_code(login_prompt, login_tc, max_attempts=3)
             print(f"{'✅ 세션 복원 성공!' if login_success else '❌ 세션 복원 실패: ' + str(login_error)}")
 
         if idx < len(test_cases):
@@ -297,11 +329,13 @@ def main():
     print("="*60)
 
     success_count = sum(1 for r in results if r['status'] == 'SUCCESS')
-    total = len(test_cases)
+    skipped_count = sum(1 for r in results if r['status'] == 'SKIPPED')
+    failed_count  = sum(1 for r in results if r['status'] == 'FAILED')
 
-    print(f"\n총 {total}개")
+    print(f"\n총 {len(test_cases)}개")
     print(f"✅ 성공: {success_count}개")
-    print(f"❌ 실패: {total - success_count}개")
+    print(f"⏭️  스킵: {skipped_count}개")
+    print(f"❌ 실패: {failed_count}개")
 
 if __name__ == '__main__':
     main()

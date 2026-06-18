@@ -66,7 +66,7 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
             await page.goto('URL', timeout=30000)
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state('domcontentloaded')
 
             # 테스트 로직
 
@@ -160,13 +160,13 @@ await btn.click(force=True)
 ### 절대 금지
 - `sys.stdout = io.TextIOWrapper(...)` 사용 금지 — pytest stdout 캡처를 파괴함
 - 중간 단계 스크린샷 추가 금지 (step1, step2, login_page 등 이름의 스크린샷)
+- `wait_for_load_state('networkidle')` 사용 금지 — wanted.co.kr은 백그라운드 요청이 지속되어 30초 timeout 발생. 반드시 `'domcontentloaded'` 사용
 
 ---
 
 ## 작업 절차
 
-1. `test/test_{NO}_working.py` 파일 생성 후 코드 작성
-2. `python test/test_{NO}_working.py` 실행
-3. 성공 시 → `test/test_{NO}_success.py`로 이름 변경
-4. 실패 시 → 에러 분석 후 코드 수정하여 재시도
-5. 반드시 마지막에 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력
+1. `test/{FOLDER}/test_{FOLDER}_{NNN}_success.py` 파일에 바로 코드 작성 (working.py 중간 파일 생성 금지)
+2. `python3 test/{FOLDER}/test_{FOLDER}_{NNN}_success.py` 실행
+3. 실패 시 → 에러 분석 후 같은 파일에 덮어쓰기 후 재시도 (파일명 변경 금지)
+4. 반드시 마지막에 `AUTOMATION_SUCCESS` 또는 `AUTOMATION_FAILED: 에러메시지` 출력

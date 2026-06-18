@@ -202,67 +202,83 @@ python run_automation.py
 #### pytest로 실행
 ```bash
 # 전체 테스트 실행
-pytest test/ # 간단 실행
-pytest test/ -v # 상세 정보 노출
+pytest test/ -v
 
-# 병렬 실행 (빠름)
-pytest test/ -v -n 4
+# 특정 폴더만 실행
+pytest test/RESUME/ -v
+pytest test/LOGIN/ -v
 
 # 특정 테스트만 실행
-pytest test/test_01_success.py -v
-
-# 성공한 테스트만
-pytest test/ -v -k "success"
+pytest test/RESUME/test_RESUME_006_success.py -v
 ```
 
 #### Python으로 직접 실행
 ```bash
 # 개별 실행
-python3 test/test_01_success.py
+python3 test/RESUME/test_RESUME_006_success.py
 ```
 
 ### 옵션 3: 전체 테스트 순차 실행 + 결과 요약
 
-생성된 모든 테스트 파일을 순서대로 실행하고, 종료 후 성공/실패 케이스를 요약합니다.
+생성된 모든 테스트 파일을 `test_cases.json`의 NO 순서대로 실행하고, 종료 후 성공/실패 케이스를 요약합니다.
 
 ```bash
 python3 run_all_tests.py
 ```
 
-- 각 TC가 실행되는 과정을 실시간으로 확인 가능
-- TC #05(로그아웃) 완료 후 TC #03(로그인)을 자동 재실행하여 세션 복원
-- 전체 종료 후 실패한 케이스 목록 출력:
+- 각 TC 실행 결과를 실시간으로 확인 가능
+- LOGIN-005(로그아웃) 완료 후 LOGIN-003(로그인)을 자동 재실행하여 세션 복원
+- 실패한 케이스는 `logs/failed_RESUME_006.log`에 실패 사유와 함께 저장
+- 전체 종료 후 실패 케이스 목록 출력:
 ```
 📊 최종 결과
 ✅ 성공: 59개  /  ❌ 실패: 2개  /  전체: 61개
 
 ❌ 실패한 케이스:
-   - TC #15  (test_15_success.py)
-   - TC #38  (test_38_success.py)
+   RESUME-006  →  이력서 편집 페이지 진입 실패: https://...
+               logs/failed_RESUME_006.log
 ```
 
-### 옵션 4: 특정 테스트 케이스만 재실행
+### 옵션 4: 특정 테스트 케이스만 재생성
 
-코드 생성에 실패한 특정 케이스만 단독으로 다시 실행할 수 있습니다.
+코드 생성에 실패한 특정 케이스만 TestCaseID로 지정하여 단독 재생성합니다.
 
 ```bash
-# NO:4 케이스만 재실행
-python3 claude_automation.py --test-no 4
+python3 claude_automation.py --tc RESUME-006
+python3 claude_automation.py --tc LOGIN-001
 ```
 
-- 전체 케이스를 처음부터 다시 실행하지 않아도 됩니다.
-- `test_cases.json`에서 해당 `NO` 값을 가진 케이스만 찾아 실행합니다.
-- 성공 시 `test/test_04_success.py`로 저장됩니다.
+- `--tc` 옵션 사용 시 이미 생성된 파일이 있어도 강제로 덮어씁니다.
+- 성공 시 `test/RESUME/test_RESUME_006_success.py`로 저장됩니다.
+- 실패 시 마지막 시도 코드가 `test/RESUME/test_RESUME_006_failed.py`로 보존됩니다.
 
-### 옵션 5: 단계별 수동 실행
+### 옵션 5: 중단 후 이어서 생성
+
+스크립트 실행 중 중단한 경우, 다시 실행하면 **이미 생성된 케이스는 자동으로 스킵**하고 미완료 케이스부터 이어서 생성합니다.
+
+```bash
+# 중단 후 재실행 — 완료된 케이스 스킵, 미완료 케이스만 생성
+python3 claude_automation.py
+```
+
+```
+⏭️  [LOGIN-001] 이미 생성됨, 스킵
+⏭️  [LOGIN-002] 이미 생성됨, 스킵
+📝 테스트 3/72: LOGIN-003   ← 여기서부터 재개
+```
+
+### 옵션 6: 단계별 수동 실행
 ```bash
 # 1. TC 다운로드만
 python3 download_tc.py
 
-# 2. 특정 TC 코드 생성만
-python3 claude_automation.py --test-no 1
+# 2. 전체 코드 생성 (이어서 생성 가능)
+python3 claude_automation.py
 
-# 3. 테스트 실행만
+# 3. 특정 케이스만 재생성
+python3 claude_automation.py --tc RESUME-006
+
+# 4. 테스트 실행만
 pytest test/ -v
 ```
 
@@ -306,21 +322,21 @@ exportJson.gs에서 forceAuthorize 함수 실행하여 권한 승인 실행 후 
 ```
 sheets-automation/
 ├── venv/                       # Python 가상환경
-├── test/                       # 생성된 Playwright 테스트 코드
-│   ├── test_01_success.py
-│   ├── test_02_success.py
-│   └── ...
-├── test_results/               # 실행 결과 JSON
-│   └── result_20260424_172603.json
+├── test/                       # 생성된 Playwright 테스트 코드 (기능영역별 폴더)
+│   ├── LOGIN/
+│   │   ├── test_LOGIN_001_success.py
+│   │   ├── test_LOGIN_002_success.py
+│   │   └── test_LOGIN_003_failed.py   # 마지막 실패 시도 코드 보존
+│   ├── RESUME/
+│   │   ├── test_RESUME_001_success.py
+│   │   └── ...
+│   └── {기능영역}/
+│       └── test_{기능영역}_{NNN}_{success|failed}.py
 ├── screenshots/                # 테스트 스크린샷
-│   ├── test_01_success.png
-│   └── test_01_failed.png
-├── logs/                       # 실행 로그
-│   └── test_20260424_172603.log
-├── work/                       # 임시 작업 파일 (프롬프트, 시도 로그 등)
-│   ├── auth_state.json         # 로그인 세션 저장 파일
-│   ├── test_N_prompt.txt
-│   └── test_N_attempt_M.log
+├── logs/                       # 실패한 케이스 로그 (run_all_tests.py 실행 시 생성)
+│   └── failed_RESUME_006.log   # 실패 사유 포함
+├── work/                       # 로그인 세션 파일
+│   └── auth_state.json         # 로그인 세션 저장 파일
 ├── .github/
 │   └── workflows/
 │       └── run-tests.yml       # GitHub Actions 워크플로우
@@ -334,6 +350,11 @@ sheets-automation/
 ├── requirements.txt            # Python 의존성
 └── README.md
 ```
+
+### 파일 명명 규칙
+- 성공: `test/{PREFIX}/test_{PREFIX}_{NNN}_success.py`
+- 실패 (마지막 시도 보존): `test/{PREFIX}/test_{PREFIX}_{NNN}_failed.py`
+- PREFIX는 TestCaseID의 기능영역 (예: LOGIN, RESUME, PROFILE 등)
 
 ---
 
