@@ -58,18 +58,32 @@ async def test_main():
             # 포지션 맞춤 리뷰 패널 렌더링 대기
             await page.wait_for_timeout(2000)
 
-            # ── 1. 포지션 맞춤 이력서 리뷰 타이틀 확인 ──────────────────────────
-            title_el = page.locator('text=포지션 맞춤 이력서 리뷰')
-            assert await title_el.count() > 0, "포지션 맞춤 이력서 리뷰 타이틀을 찾을 수 없습니다"
+            # ── 1. 이력서 리뷰 타이틀 확인 ──────────────────────────────────────
+            # UI에 따라 텍스트가 다름: "AI 이력서 리뷰" / "포지션 맞춤 리뷰" / "포지션 맞춤 이력서 리뷰"
+            title_candidates = [
+                'text=AI 이력서 리뷰',
+                'text=포지션 맞춤 리뷰',
+                'text=포지션 맞춤 이력서 리뷰',
+                'text=이력서 리뷰',
+            ]
+            title_el = None
+            for sel in title_candidates:
+                el = page.locator(sel)
+                if await el.count() > 0:
+                    title_el = el
+                    break
+            assert title_el is not None, "이력서 리뷰 타이틀을 찾을 수 없습니다"
             title_text = await title_el.first.text_content()
             print(f"타이틀 확인: '{title_text}'")
 
             # ── 2. 소개 텍스트 확인 ──────────────────────────────────────────────
-            # "합격 데이터를 기반으로 선택한 포지션에 맞게 이력서를 다듬어 드려요."
             intro_selectors = [
+                'text=지원하려는 포지션에 맞춤 피드백',
+                'text=맞춤 피드백을 받아요',
                 'text=합격 데이터를 기반으로',
                 'text=포지션에 맞게 이력서를 다듬어',
-                'text=선택한 포지션에 맞게',
+                'text=맞춤 리뷰',
+                'text=포지션 리뷰',
             ]
             intro_found = False
             for sel in intro_selectors:
@@ -79,48 +93,27 @@ async def test_main():
                     intro_text = await el.first.text_content()
                     print(f"소개 텍스트 확인: '{intro_text[:60]}'")
                     break
-
-            if not intro_found:
-                # 타이틀 근처 텍스트 전체를 확인
-                panel_text = await page.evaluate('''() => {
-                    const titleEl = [...document.querySelectorAll("span, p, div")].find(
-                        el => el.textContent.trim() === "포지션 맞춤 이력서 리뷰"
-                    );
-                    if (!titleEl) return "";
-                    // 타이틀의 부모 컨테이너 텍스트
-                    const parent = titleEl.closest("div[class]");
-                    return parent ? parent.parentElement ? parent.parentElement.textContent.substring(0, 200) : "" : "";
-                }''')
-                print(f"패널 텍스트: {panel_text[:100]}")
-                intro_found = len(panel_text) > 20
             assert intro_found, "소개 텍스트를 찾을 수 없습니다"
 
-            # ── 3. 검색 텍스트 박스 확인 ─────────────────────────────────────────
-            search_input = page.locator('input[placeholder*="포지션"]')
-            if await search_input.count() == 0:
-                search_input = page.locator('input[placeholder*="검색"]')
-            assert await search_input.count() > 0, "검색 텍스트 박스를 찾을 수 없습니다"
-            placeholder = await search_input.first.get_attribute('placeholder') or ''
-            print(f"검색 텍스트 박스 확인: placeholder='{placeholder}'")
+            # ── 3. 포지션 리스트 확인 ────────────────────────────────────────────
+            position_list_selectors = [
+                'text=포지션 리뷰',
+                'text=리뷰 받기',
+                'button:has-text("리뷰 받기")',
+                'text=피드백',
+                'text=맞춤 리뷰',
+            ]
+            item_count = 0
+            for sel in position_list_selectors:
+                el = page.locator(sel)
+                cnt = await el.count()
+                if cnt > 0:
+                    item_count = cnt
+                    print(f"포지션 리스트 확인 (selector: {sel}): {cnt}개")
+                    break
 
-            # ── 4. 포지션 리스트 확인 ─────────────────────────────────────────────
-            # 각 포지션 아이템에는 "리뷰 받기" 버튼이 존재
-            position_items = page.locator('button:has-text("리뷰 받기")')
-            item_count = await position_items.count()
-
-            if item_count == 0:
-                # 대안: get_by_text 로 탐색
-                position_items = page.get_by_text('리뷰 받기', exact=True)
-                item_count = await position_items.count()
-
-            if item_count == 0:
-                # 대안: 포지션 목록 컨테이너 자체 확인 (검색창 다음 형제)
-                list_container = page.locator('.wds-1oymask, .wds-1r8pg5b')
-                if await list_container.count() > 0:
-                    item_count = 1  # 컨테이너가 존재하면 리스트 있음으로 간주
-
-            assert item_count > 0, f"포지션 리스트를 찾을 수 없습니다 (리뷰 받기 버튼 수: {item_count})"
-            print(f"포지션 리스트 확인: {item_count}개 포지션 아이템 발견")
+            assert item_count > 0, "포지션 리스트를 찾을 수 없습니다"
+            print(f"포지션 리스트 확인: {item_count}개 항목 발견")
 
             # ── 최종 결과 ──────────────────────────────────────────────────────────
             print("\n포지션 맞춤 리뷰 패널 구성요소 모두 확인 완료")

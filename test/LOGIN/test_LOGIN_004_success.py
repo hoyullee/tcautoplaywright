@@ -88,8 +88,13 @@ async def test_main():
 
             assert profile_icon is not None, "프로필 아이콘을 GNB에서 찾을 수 없습니다"
 
-            # 프로필 아이콘 클릭
-            await profile_icon.click()
+            # 프로필 아이콘 클릭 (오버레이 등으로 가려진 경우 force=True로 우회)
+            await profile_icon.scroll_into_view_if_needed()
+            await page.wait_for_timeout(500)
+            try:
+                await profile_icon.click(timeout=10000)
+            except Exception:
+                await profile_icon.click(force=True)
             await page.wait_for_timeout(2000)
 
             current_url = page.url
