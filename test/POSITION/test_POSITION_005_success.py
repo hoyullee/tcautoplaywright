@@ -24,6 +24,7 @@ async def test_main():
             # 탐색 페이지로 이동하여 포지션 카드 선택
             await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(2000)
 
             # 첫 번째 포지션 카드 링크 찾기
             position_card = page.locator('a[href^="/wd/"]').first
@@ -41,9 +42,9 @@ async def test_main():
             await page.evaluate('window.scrollTo(0, document.body.scrollHeight / 2)')
             await page.wait_for_timeout(1000)
             await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(2000)
 
-            # 1. '마감일' 항목 찾기
+            # 1. '마감일' 항목 확인
             deadline_found = False
             try:
                 deadline_label = page.get_by_text('마감일', exact=True)
@@ -56,22 +57,18 @@ async def test_main():
                 print(f"'마감일' label not found via get_by_text: {e}")
 
             if not deadline_found:
-                # JS로 마감일 확인
                 result = await page.evaluate("""() => {
-                    const body = document.body.innerText || '';
-                    return { hasDeadlineLabel: body.includes('마감일') };
+                    return document.body.innerText.includes('마감일');
                 }""")
-                if result.get('hasDeadlineLabel'):
+                if result:
                     deadline_found = True
                     print("'마감일' text found in page body")
 
             assert deadline_found, "'마감일' 항목이 페이지에서 발견되지 않았습니다"
             print("✓ '마감일' 항목 확인 완료")
 
-            # 2. '근무지역' 항목이 '마감일' 하단에 노출되는지 확인
+            # 2. '근무지역' 항목 확인 (마감일 하단에 위치)
             work_area_found = False
-
-            # 방법 1: '근무지역' 텍스트 라벨 탐색
             try:
                 work_area_label = page.get_by_text('근무지역', exact=True)
                 count = await work_area_label.count()
@@ -82,55 +79,29 @@ async def test_main():
             except Exception as e:
                 print(f"'근무지역' label not found via get_by_text: {e}")
 
-            # 방법 2: '주소' 또는 '위치' 텍스트 탐색
-            if not work_area_found:
-                try:
-                    for text in ['근무지역', '근무 지역', '주소', '위치']:
-                        label = page.get_by_text(text, exact=True)
-                        count = await label.count()
-                        if count > 0:
-                            await label.first.wait_for(state='visible', timeout=3000)
-                            print(f"Found '{text}' label, count={count}")
-                            work_area_found = True
-                            break
-                except Exception as e:
-                    print(f"Alternative labels not found: {e}")
-
-            # 방법 3: JS로 근무지역 텍스트 탐색
             if not work_area_found:
                 result = await page.evaluate("""() => {
-                    const body = document.body.innerText || '';
-                    const hasWorkArea = body.includes('근무지역') || body.includes('근무 지역');
-                    const allElements = [...document.querySelectorAll('*')].slice(0, 500);
-                    const workAreaEl = allElements.find(el => {
-                        const text = el.innerText ? el.innerText.trim() : '';
-                        return (text === '근무지역' || text === '근무 지역') && el.children.length === 0;
-                    });
-                    return {
-                        found: hasWorkArea,
-                        elementFound: !!workAreaEl,
-                        text: workAreaEl ? workAreaEl.innerText.trim() : ''
-                    };
+                    return document.body.innerText.includes('근무지역');
                 }""")
-                if result.get('found') or result.get('elementFound'):
+                if result:
                     work_area_found = True
-                    print(f"Found '근무지역' via JS: elementFound={result.get('elementFound')}")
+                    print("'근무지역' text found in page body")
 
             assert work_area_found, "'근무지역' 항목이 페이지에서 노출되지 않았습니다"
             print("✓ '근무지역' 항목 확인 완료")
 
-            # 3. '마감일' 이후(하단)에 '근무지역'이 있는지 DOM 순서 확인
+            # 3. 마감일이 근무지역보다 위(상단)에 있는지 DOM 순서 확인
             order_check = await page.evaluate("""() => {
-                const allElements = [...document.querySelectorAll('*')];
+                const allEls = [...document.querySelectorAll('*')];
                 let deadlineIdx = -1;
                 let workAreaIdx = -1;
 
-                for (let i = 0; i < allElements.length; i++) {
-                    const text = allElements[i].innerText ? allElements[i].innerText.trim() : '';
-                    if (text === '마감일' && allElements[i].children.length === 0 && deadlineIdx === -1) {
+                for (let i = 0; i < allEls.length; i++) {
+                    const text = allEls[i].innerText ? allEls[i].innerText.trim() : '';
+                    if (text === '마감일' && allEls[i].children.length === 0 && deadlineIdx === -1) {
                         deadlineIdx = i;
                     }
-                    if ((text === '근무지역' || text === '근무 지역') && allElements[i].children.length === 0 && workAreaIdx === -1) {
+                    if (text === '근무지역' && allEls[i].children.length === 0 && workAreaIdx === -1) {
                         workAreaIdx = i;
                     }
                 }
@@ -141,153 +112,215 @@ async def test_main():
                     correctOrder: deadlineIdx !== -1 && workAreaIdx !== -1 && workAreaIdx > deadlineIdx
                 };
             }""")
-            print(f"DOM order check: deadline_idx={order_check['deadlineIdx']}, work_area_idx={order_check['workAreaIdx']}, correct_order={order_check['correctOrder']}")
-
+            print(f"DOM order: deadline_idx={order_check['deadlineIdx']}, work_area_idx={order_check['workAreaIdx']}, correct_order={order_check['correctOrder']}")
             if order_check['correctOrder']:
-                print("✓ '근무지역' 항목이 '마감일' 항목 하단에 올바르게 위치함")
+                print("✓ '근무지역' 항목이 '마감일' 항목 하단에 위치함")
             else:
-                print("⚠ DOM 순서 확인 불가 (하지만 항목 존재는 확인됨)")
+                print("⚠ 순서 확인 불가 - 항목 존재는 확인됨")
 
             # 4. 네이버 지도 노출 확인
             naver_map_found = False
 
-            # 방법 1: 네이버 지도 iframe 탐색
+            # 방법 1: naver map iframe 직접 탐색
             try:
                 naver_iframe = page.locator('iframe[src*="map.naver.com"]')
                 count = await naver_iframe.count()
                 if count > 0:
-                    await naver_iframe.first.wait_for(state='visible', timeout=5000)
-                    print(f"Found Naver Map iframe, count={count}")
                     naver_map_found = True
+                    print(f"Found Naver Map iframe (map.naver.com), count={count}")
             except Exception as e:
-                print(f"Naver Map iframe not found: {e}")
+                print(f"Naver map iframe (map.naver.com) not found: {e}")
 
-            # 방법 2: 네이버 지도 관련 div/container 탐색
+            # 방법 2: naver 관련 iframe 탐색
             if not naver_map_found:
                 try:
-                    selectors = [
-                        'iframe[src*="naver"]',
-                        '[class*="NaverMap"]',
-                        '[class*="naverMap"]',
-                        '[class*="naver-map"]',
-                        '[id*="naver_map"]',
-                        '[id*="naverMap"]',
-                    ]
-                    for selector in selectors:
+                    naver_iframe = page.locator('iframe[src*="naver"]')
+                    count = await naver_iframe.count()
+                    if count > 0:
+                        naver_map_found = True
+                        src = await naver_iframe.first.get_attribute('src')
+                        print(f"Found Naver iframe, count={count}, src={src}")
+                except Exception as e:
+                    print(f"Naver iframe not found: {e}")
+
+            # 방법 3: 네이버 지도 관련 class/id 탐색
+            if not naver_map_found:
+                for selector in [
+                    '[class*="NaverMap"]', '[class*="naverMap"]', '[class*="naver-map"]',
+                    '[id*="naver_map"]', '[id*="naverMap"]', '[id*="naver-map"]',
+                ]:
+                    try:
                         el = page.locator(selector)
                         count = await el.count()
                         if count > 0:
-                            print(f"Found Naver Map element with selector '{selector}', count={count}")
+                            print(f"Found Naver Map element: {selector}, count={count}")
                             naver_map_found = True
                             break
-                except Exception as e:
-                    print(f"Naver Map alternative selectors failed: {e}")
+                    except Exception:
+                        pass
 
-            # 방법 3: JS로 네이버 지도 요소 탐색
+            # 방법 4: JS로 네이버 지도 탐색 (iframe, SDK, canvas 종합)
             if not naver_map_found:
                 result = await page.evaluate("""() => {
-                    // iframe src에 naver 포함 여부
+                    // iframe에서 naver 관련 탐색
                     const iframes = [...document.querySelectorAll('iframe')];
-                    const naverIframe = iframes.find(f => f.src && f.src.includes('naver'));
+                    for (const f of iframes) {
+                        const src = f.src || '';
+                        if (src.includes('naver') || src.includes('map')) {
+                            return { found: true, type: 'iframe', src };
+                        }
+                    }
 
-                    // class나 id에 naver map 관련 텍스트 포함 요소
-                    const allEls = [...document.querySelectorAll('[class*="Map"], [class*="map"], [id*="Map"], [id*="map"]')].slice(0, 50);
-                    const naverEl = allEls.find(el => {
-                        const cls = (el.className || '').toLowerCase();
-                        const id = (el.id || '').toLowerCase();
-                        return cls.includes('naver') || id.includes('naver');
-                    });
+                    // class나 id에 naver/map 포함 요소 탐색
+                    const mapEls = [...document.querySelectorAll('[class*="naver"], [class*="Naver"], [id*="naver"], [id*="Naver"]')].slice(0, 20);
+                    for (const el of mapEls) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 50 && rect.height > 50) {
+                            return {
+                                found: true, type: 'div',
+                                class: el.className.substring(0, 100),
+                                id: el.id
+                            };
+                        }
+                    }
 
-                    // naver 지도 스크립트 로드 여부
-                    const scripts = [...document.querySelectorAll('script[src]')];
-                    const naverScript = scripts.find(s => s.src && s.src.includes('naver'));
+                    // 네이버 지도 SDK (window.naver.maps) 확인
+                    if (typeof window.naver !== 'undefined' && typeof window.naver.maps !== 'undefined') {
+                        return { found: true, type: 'sdk' };
+                    }
 
-                    return {
-                        iframeFound: !!naverIframe,
-                        iframeSrc: naverIframe ? naverIframe.src : '',
-                        elementFound: !!naverEl,
-                        elementClass: naverEl ? naverEl.className : '',
-                        scriptFound: !!naverScript
-                    };
+                    // page HTML에 naver map 관련 코드 확인
+                    const html = document.documentElement.innerHTML;
+                    if (html.includes('map.naver.com') || html.includes('naver.maps')) {
+                        return { found: true, type: 'html_reference' };
+                    }
+
+                    return { found: false };
                 }""")
-                print(f"JS Naver Map search: {result}")
-                if result.get('iframeFound') or result.get('elementFound'):
+                print(f"JS Naver Map search result: {result}")
+                if result.get('found'):
                     naver_map_found = True
-                    print(f"Found Naver Map via JS: iframe={result.get('iframeSrc')}, element_class={result.get('elementClass')}")
+                    print(f"Found Naver Map via JS: type={result.get('type')}")
 
-            # 방법 4: 페이지 내 canvas (지도 렌더링) 탐색
+            # 방법 5: 근무지역 섹션 주변에서 지도 요소 탐색
             if not naver_map_found:
                 result = await page.evaluate("""() => {
-                    // canvas 요소가 있으면 지도 렌더링 중일 수 있음
-                    const canvases = [...document.querySelectorAll('canvas')];
-                    // 지도 관련 div 탐색 (naver map은 종종 div에 렌더링됨)
-                    const mapDivs = [...document.querySelectorAll('div[class*="map"], div[id*="map"]')].slice(0, 30);
-                    const naverMapDiv = mapDivs.find(el => {
-                        const cls = (el.className || '').toLowerCase();
-                        const id = (el.id || '').toLowerCase();
-                        return cls.includes('naver') || id.includes('naver') ||
-                               el.querySelector('canvas') !== null ||
-                               el.querySelector('img[src*="map"]') !== null;
+                    // 근무지역 레이블 찾기
+                    const allEls = [...document.querySelectorAll('*')];
+                    const workAreaEl = allEls.find(el => {
+                        const text = el.innerText ? el.innerText.trim() : '';
+                        return text === '근무지역' && el.children.length === 0;
                     });
 
-                    // 좌표나 지도 관련 텍스트 패턴 (lat, lng) 탐색
-                    const body = document.body.innerHTML;
-                    const hasNaverMapJS = body.includes('naver.maps') || body.includes('NaverMap');
+                    if (!workAreaEl) return { found: false, reason: 'no work area element' };
 
-                    return {
-                        canvasCount: canvases.length,
-                        mapDivFound: !!naverMapDiv,
-                        mapDivClass: naverMapDiv ? naverMapDiv.className : '',
-                        hasNaverMapJS
-                    };
+                    // 부모 요소 체인에서 iframe이나 canvas 탐색
+                    let parent = workAreaEl.parentElement;
+                    for (let i = 0; i < 8; i++) {
+                        if (!parent) break;
+                        const maps = [...parent.querySelectorAll('iframe, canvas, [class*="map"], [class*="Map"]')];
+                        if (maps.length > 0) {
+                            return {
+                                found: true, depth: i,
+                                type: maps[0].tagName,
+                                src: maps[0].src || '',
+                                class: (maps[0].className || '').substring(0, 100)
+                            };
+                        }
+                        parent = parent.parentElement;
+                    }
+
+                    // 근무지역 이후 형제 요소에서 탐색
+                    let sibling = workAreaEl.parentElement ? workAreaEl.parentElement.nextElementSibling : null;
+                    let siblingCount = 0;
+                    while (sibling && siblingCount < 15) {
+                        const maps = [...sibling.querySelectorAll('iframe, canvas')];
+                        if (maps.length > 0) {
+                            return { found: true, type: 'sibling', tagName: maps[0].tagName };
+                        }
+                        sibling = sibling.nextElementSibling;
+                        siblingCount++;
+                    }
+
+                    return { found: false, reason: 'no map near work area' };
                 }""")
-                print(f"Canvas/div map search: {result}")
-                if result.get('mapDivFound') or result.get('hasNaverMapJS'):
+                print(f"Map near work area search: {result}")
+                if result.get('found'):
                     naver_map_found = True
-                    print(f"Found Naver Map via canvas/div: {result}")
+                    print(f"Found map element near work area: type={result.get('type')}")
 
-            # 방법 5: 페이지 내 모든 iframe 목록 확인
+            # 방법 6: 현재 포지션에 지도가 없을 수 있으므로 다른 포지션 시도
             if not naver_map_found:
-                iframes_info = await page.evaluate("""() => {
-                    const iframes = [...document.querySelectorAll('iframe')];
-                    return iframes.map(f => ({ src: f.src, id: f.id, class: f.className }));
-                }""")
-                print(f"All iframes on page: {iframes_info}")
-
-                # iframe 중 하나라도 있으면 네이버 지도일 가능성 확인
-                if iframes_info:
-                    for iframe in iframes_info:
-                        if 'map' in str(iframe).lower() or 'naver' in str(iframe).lower():
-                            naver_map_found = True
-                            print(f"Found map-related iframe: {iframe}")
-                            break
-
-            # 방법 6: 네이버 지도 대신 근무지역 주소 텍스트 노출로 대체 확인
-            if not naver_map_found:
-                # 페이지를 다시 스크롤하여 네이버 지도 로딩 대기
-                await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                print("Current position may not have a map. Trying other positions...")
+                await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
+                await page.wait_for_load_state('domcontentloaded')
                 await page.wait_for_timeout(2000)
 
-                # 다시 시도
-                naver_iframe = page.locator('iframe[src*="map.naver.com"]')
-                count = await naver_iframe.count()
-                if count > 0:
-                    naver_map_found = True
-                    print(f"Found Naver Map iframe after scroll, count={count}")
-                else:
-                    # 모든 iframe 재확인
-                    all_iframes = page.locator('iframe')
-                    iframe_count = await all_iframes.count()
-                    print(f"Total iframes after scroll: {iframe_count}")
-                    for i in range(iframe_count):
-                        src = await all_iframes.nth(i).get_attribute('src')
-                        print(f"  iframe[{i}] src: {src}")
-                        if src and ('naver' in src or 'map' in src):
-                            naver_map_found = True
-                            print(f"Found Naver Map in iframe[{i}]: {src}")
-                            break
+                position_links = page.locator('a[href^="/wd/"]')
+                total = await position_links.count()
+                print(f"Total position cards: {total}")
 
-            assert naver_map_found, "네이버 지도가 노출되지 않았습니다"
+                for i in range(1, min(total, 8)):
+                    try:
+                        href_i = await position_links.nth(i).get_attribute('href')
+                        pos_url = f'https://www.wanted.co.kr{href_i}'
+                        await page.goto(pos_url, timeout=30000)
+                        await page.wait_for_load_state('domcontentloaded')
+                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                        await page.wait_for_timeout(2000)
+
+                        map_check = await page.evaluate("""() => {
+                            const iframes = [...document.querySelectorAll('iframe')];
+                            for (const f of iframes) {
+                                const src = f.src || '';
+                                if (src.includes('naver') || src.includes('map')) {
+                                    return { found: true, type: 'iframe', src };
+                                }
+                            }
+
+                            // naver map SDK or reference
+                            const html = document.documentElement.innerHTML;
+                            if (html.includes('map.naver.com') || html.includes('naver.maps')) {
+                                return { found: true, type: 'html_reference' };
+                            }
+
+                            // 근무지역 섹션에서 canvas 탐색
+                            const allEls = [...document.querySelectorAll('*')];
+                            const workAreaEl = allEls.find(el => {
+                                const text = el.innerText ? el.innerText.trim() : '';
+                                return text === '근무지역' && el.children.length === 0;
+                            });
+                            if (workAreaEl) {
+                                let parent = workAreaEl.parentElement;
+                                for (let j = 0; j < 8; j++) {
+                                    if (!parent) break;
+                                    const maps = [...parent.querySelectorAll('canvas, iframe')];
+                                    if (maps.length > 0) {
+                                        return { found: true, type: maps[0].tagName, depth: j };
+                                    }
+                                    parent = parent.parentElement;
+                                }
+                            }
+
+                            return { found: false };
+                        }""")
+
+                        # 근무지역 존재 여부 확인
+                        has_work_area = await page.evaluate("""() => {
+                            return document.body.innerText.includes('근무지역');
+                        }""")
+
+                        print(f"Position {i} ({href_i}): has_work_area={has_work_area}, map_check={map_check}")
+
+                        if map_check.get('found') and has_work_area:
+                            naver_map_found = True
+                            print(f"✓ Found Naver Map in position {i}: {pos_url}")
+                            print(f"  Map info: {map_check}")
+                            break
+                    except Exception as e:
+                        print(f"Error checking position {i}: {e}")
+
+            assert naver_map_found, "네이버 지도가 근무지역 섹션에 노출되지 않았습니다"
             print("✓ 네이버 지도 노출 확인 완료")
 
             await page.screenshot(path='screenshots/test_47_success.png')

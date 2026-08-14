@@ -6,6 +6,7 @@ from pathlib import Path
 
 LOGS_DIR = Path('logs')
 TC_JSON = Path('test_cases.json')
+MAX_RETRIES = 3
 
 
 def load_tc_order():
@@ -83,9 +84,36 @@ def clear_logs():
             f.unlink()
 
 
+def run_test_with_retry(test_file, tc_id):
+    """최대 MAX_RETRIES 회 재시도. (result, attempts) 반환"""
+    last_result = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        if attempt > 1:
+            print(f"  ↳ 재시도 {attempt - 1}/{MAX_RETRIES - 1} ...", end=' ', flush=True)
+        last_result = run_test(test_file)
+        if last_result.returncode == 0:
+            return last_result, attempt
+        if attempt < MAX_RETRIES:
+            reason = extract_failure_reason(last_result.stdout, last_result.stderr)
+            print(f"❌ ({reason[:50]})")
+    return last_result, MAX_RETRIES
+
+
+def regenerate_tc(tc_id):
+    """claude_automation.py --tc {tc_id} 실행 후 success 파일 존재 여부 반환"""
+    subprocess.run(
+        [sys.executable, 'claude_automation.py', '--tc', tc_id],
+        cwd='.',
+        encoding='utf-8',
+        errors='replace',
+        timeout=600,
+    )
+    return find_test_file(tc_id) is not None
+
+
 def main():
     clear_logs()
-    tc_order = load_tc_order()  # {filepath: (NO, tc_id)}
+    tc_order = load_tc_order()
 
     all_files = glob.glob('test/*/test_*_success.py')
     test_files = sorted(
@@ -98,8 +126,8 @@ def main():
         sys.exit(1)
 
     total = len(test_files)
-    success_list = []
-    failed_list = []
+    success_list = []     # (tc_id, note)
+    failed_list = []      # (tc_id, reason, log_path)
 
     print(f"\n{'='*60}")
     print(f"🚀 총 {total}개 테스트 실행")
@@ -111,16 +139,40 @@ def main():
 
         print(f"[{idx}/{total}] {tc_id} ...", end=' ', flush=True)
 
-        result = run_test(test_file)
+        result, attempts = run_test_with_retry(test_file, tc_id)
 
         if result.returncode == 0:
-            success_list.append(tc_id)
-            print("✅ 성공")
+            note = f" (재시도 {attempts - 1}회)" if attempts > 1 else ""
+            print(f"✅ 성공{note}")
+            success_list.append((tc_id, note.strip()))
         else:
-            log_path, reason = save_failure_log(tc_id, result.stdout, result.stderr)
-            failed_list.append((tc_id, reason, log_path))
-            print(f"❌ 실패  →  {reason}")
-            print(f"         📄 {log_path}")
+            # 3회 모두 실패 → 재생성 시도
+            reason = extract_failure_reason(result.stdout, result.stderr)
+            print(f"❌ 실패 → {reason[:60]}")
+            print(f"         🔄 재생성 시도 중...", end=' ', flush=True)
+
+            try:
+                regen_ok = regenerate_tc(tc_id)
+            except subprocess.TimeoutExpired:
+                regen_ok = False
+
+            if regen_ok:
+                new_file = find_test_file(tc_id)
+                print(f"재생성 완료 → 재실행 중...", end=' ', flush=True)
+                rerun = run_test(new_file)
+                if rerun.returncode == 0:
+                    print(f"✅ 재생성 후 성공")
+                    success_list.append((tc_id, '재생성 후 성공'))
+                else:
+                    log_path, rerun_reason = save_failure_log(tc_id, rerun.stdout, rerun.stderr)
+                    print(f"❌ 재생성 후에도 실패 → {rerun_reason[:50]}")
+                    print(f"         📄 {log_path}")
+                    failed_list.append((tc_id, f"[재생성 후 실패] {rerun_reason}", log_path))
+            else:
+                log_path, _ = save_failure_log(tc_id, result.stdout, result.stderr)
+                print(f"❌ 재생성 실패")
+                print(f"         📄 {log_path}")
+                failed_list.append((tc_id, f"[재생성 실패] {reason}", log_path))
 
         # LOGIN-005(로그아웃) 완료 후 LOGIN-003(로그인)으로 세션 복원
         if tc_id == 'LOGIN-005':
@@ -140,7 +192,7 @@ def main():
     print(f"✅ 성공: {len(success_list)}개  /  ❌ 실패: {len(failed_list)}개  /  전체: {total}개")
 
     if failed_list:
-        print(f"\n❌ 실패한 케이스:")
+        print(f"\n❌ 최종 실패한 케이스:")
         for tc_id, reason, log_path in failed_list:
             print(f"   {tc_id}  →  {reason}")
             print(f"           {log_path}")

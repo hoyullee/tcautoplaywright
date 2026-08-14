@@ -72,6 +72,8 @@ async def test_main():
                 async with context.expect_page() as new_page_info:
                     await map_btn.click()
                 new_page = await new_page_info.value
+                # 새 탭이 완전히 로드될 때까지 대기
+                await new_page.wait_for_url('**/position-map/**', timeout=15000)
                 await new_page.wait_for_load_state('domcontentloaded')
                 current_url = new_page.url
                 print(f"새 탭 URL: {current_url}")
@@ -80,8 +82,9 @@ async def test_main():
             else:
                 # 같은 탭에서 열리는 경우
                 await map_btn.click()
+                await page.wait_for_url('**/position-map/**', timeout=15000)
                 await page.wait_for_load_state('domcontentloaded')
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(1000)
                 current_url = page.url
                 print(f"현재 URL: {current_url}")
                 assert 'position-map' in current_url, f"포지션맵 페이지로 이동되지 않음. 현재 URL: {current_url}"
