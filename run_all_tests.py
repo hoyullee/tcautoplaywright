@@ -111,6 +111,47 @@ def regenerate_tc(tc_id):
     return find_test_file(tc_id) is not None
 
 
+def git_commit_and_push(regenerated_tc_ids):
+    """재생성된 테스트 스크립트를 master 브랜치에 자동 커밋·푸시"""
+    print(f"\n{'='*60}")
+    print("📦 Git 자동 커밋·푸시")
+    print(f"{'='*60}")
+
+    # 변경된 test/ 파일이 실제로 있는지 확인
+    diff = subprocess.run(
+        ['git', 'diff', '--name-only', 'HEAD', '--', 'test/'],
+        capture_output=True, text=True, cwd='.'
+    )
+    untracked = subprocess.run(
+        ['git', 'ls-files', '--others', '--exclude-standard', 'test/'],
+        capture_output=True, text=True, cwd='.'
+    )
+    changed_files = (diff.stdout + untracked.stdout).strip()
+
+    if not changed_files:
+        print("ℹ️  test/ 디렉토리에 변경된 파일 없음 — 커밋 스킵")
+        return
+
+    print(f"변경 파일:\n{changed_files}\n")
+
+    tc_label = ', '.join(regenerated_tc_ids)
+    commit_msg = f"auto: regenerate test cases ({tc_label})"
+
+    steps = [
+        (['git', 'add', 'test/'], "git add test/"),
+        (['git', 'commit', '-m', commit_msg], f"git commit"),
+        (['git', 'push', 'origin', 'master'], "git push origin master"),
+    ]
+
+    for cmd, label in steps:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd='.')
+        if result.returncode == 0:
+            print(f"✅ {label}")
+        else:
+            print(f"❌ {label} 실패:\n{result.stderr.strip()}")
+            break
+
+
 def main():
     clear_logs()
     tc_order = load_tc_order()
@@ -126,8 +167,9 @@ def main():
         sys.exit(1)
 
     total = len(test_files)
-    success_list = []     # (tc_id, note)
-    failed_list = []      # (tc_id, reason, log_path)
+    success_list = []      # (tc_id, note)
+    failed_list = []       # (tc_id, reason, log_path)
+    regenerated_ids = []   # 재생성이 시도된 tc_id 목록
 
     print(f"\n{'='*60}")
     print(f"🚀 총 {total}개 테스트 실행")
@@ -150,6 +192,7 @@ def main():
             reason = extract_failure_reason(result.stdout, result.stderr)
             print(f"❌ 실패 → {reason[:60]}")
             print(f"         🔄 재생성 시도 중...", end=' ', flush=True)
+            regenerated_ids.append(tc_id)
 
             try:
                 regen_ok = regenerate_tc(tc_id)
@@ -196,6 +239,12 @@ def main():
         for tc_id, reason, log_path in failed_list:
             print(f"   {tc_id}  →  {reason}")
             print(f"           {log_path}")
+
+    # 재생성이 1회라도 있었고, 최종 실패 케이스가 없을 때만 커밋·푸시
+    if regenerated_ids and not failed_list:
+        git_commit_and_push(regenerated_ids)
+    elif regenerated_ids and failed_list:
+        print("\nℹ️  실패한 케이스가 있어 Git 커밋·푸시를 건너뜁니다.")
 
     print()
 
