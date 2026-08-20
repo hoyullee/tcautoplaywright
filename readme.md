@@ -284,6 +284,177 @@ pytest test/ -v
 
 ---
 
+## 💬 Slack 이모지로 실행하기
+
+Slack 스레드에 지정한 이모지를 달면 **Mac 로컬에서 `run_all_tests.py`가 실행되고, 결과가 같은 스레드의 답글로 돌아옵니다.**
+
+Socket Mode 방식이라 공개 URL이나 별도 서버가 필요 없습니다. 대신 리스너 프로세스가 Mac에서 상시 실행되어 있어야 합니다.
+
+```
+Slack 스레드에 :rocket: 클릭
+   ↓ 1~2초
+🚀 자동화 실행을 시작합니다. (요청: @홍길동)      ← 진행률로 계속 갱신됨
+   ↓ run_all_tests.py 실행 (수십 분)
+✅ 자동화 실행 완료 — 65/67 성공 (33분 20초)
+   ✅ 성공 65    ❌ 실패 2    전체 67
+   🔄 재생성 시도: RESUME-006, GNB-004
+   📦 master 브랜치에 자동 푸시 완료 (abc1234)
+
+   실패 케이스
+   • RESUME-006 — 이력서 편집 페이지 진입 실패
+   • GNB-004 — [재생성 후 실패] AssertionError...
+   📎 failed_RESUME_006.log  📎 failed_GNB_004.log
+```
+
+### 1. Slack App 생성 (최초 1회)
+
+**1-1. 앱 만들기**
+```
+https://api.slack.com/apps → Create New App → From scratch
+앱 이름 입력 → 워크스페이스 선택 → Create App
+```
+
+**1-2. Socket Mode 활성화 + 앱 레벨 토큰 발급**
+```
+좌측 메뉴 Socket Mode → Enable Socket Mode 를 On
+→ 토큰 이름 입력 (예: tcauto-socket)
+→ Scope 에 connections:write 포함 확인 → Generate
+→ 생성된 xapp-... 토큰 복사
+```
+
+**1-3. 봇 권한(Scope) 설정**
+```
+좌측 메뉴 OAuth & Permissions → Bot Token Scopes → Add an OAuth Scope
+```
+| Scope | 용도 |
+|---|---|
+| `reactions:read` | 이모지 추가 이벤트 수신 |
+| `chat:write` | 스레드에 답글 작성·갱신 |
+| `channels:history` | 리액션이 달린 메시지의 부모 스레드 확인 (공개 채널) |
+| `groups:history` | 비공개 채널을 쓸 경우 추가 |
+| `files:write` | 실패 로그 파일 첨부 |
+
+**1-4. 이벤트 구독**
+```
+좌측 메뉴 Event Subscriptions → Enable Events 를 On
+→ Subscribe to bot events → Add Bot User Event → reaction_added 추가
+→ Save Changes
+```
+
+**1-5. 워크스페이스에 설치**
+```
+좌측 메뉴 Install App → Install to Workspace → 권한 승인
+→ Bot User OAuth Token (xoxb-...) 복사
+```
+> 워크스페이스 정책에 따라 관리자 승인이 필요할 수 있습니다.
+
+**1-6. 채널에 봇 초대 + 채널 ID 확인**
+```
+사용할 채널에서:  /invite @앱이름
+채널 ID: 채널명 우클릭 → "링크 복사" → .../archives/C0XXXXXXX 의 C0XXXXXXX 부분
+```
+
+### 2. `.env` 설정
+
+```bash
+# Slack (필수)
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_APP_TOKEN=xapp-...
+SLACK_TRIGGER_CHANNELS=C0XXXXXXX        # 쉼표로 복수 지정 가능
+
+# Slack (선택)
+SLACK_TRIGGER_EMOJIS=rocket             # 기본값 rocket, 쉼표로 복수 지정
+SLACK_ALLOWED_USERS=U01ABC,U02DEF       # 미지정 시 채널의 누구나 실행 가능
+TCAUTO_RUN_TIMEOUT=7200                 # 실행 타임아웃(초)
+TCAUTO_AUTO_PUSH=1                      # 재생성 성공 시 자동 푸시, 끄려면 0
+TCAUTO_PUSH_BRANCH=master               # 자동 푸시 대상 브랜치
+
+# 테스트 실행에 필요 (기존)
+WANTED_TEST_EMAIL=...
+WANTED_TEST_PASSWORD=...
+
+# launchd 는 ~/.zshrc 를 읽지 않으므로 .env 에 반드시 넣어야 함
+CLAUDE_CODE_OAUTH_TOKEN=...
+```
+
+> ⚠️ `SLACK_TRIGGER_CHANNELS`를 지정하지 않으면 리스너가 시작을 거부합니다. 아무 채널에서나 67개 테스트가 도는 것을 막기 위한 안전장치입니다.
+
+### 3. 의존성 설치
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 4. 먼저 포그라운드로 동작 확인
+
+```bash
+python3 slack_listener.py
+```
+```
+============================================================
+🔌 TC 자동화 Slack 리스너 (Socket Mode)
+============================================================
+저장소       : /Users/me/tcautoplaywright
+트리거 채널  : C0XXXXXXX
+트리거 이모지: :rocket:
+허용 사용자  : 전원
+자동 푸시    : ON
+타임아웃     : 2시간 0분
+============================================================
+이모지 대기 중… (종료: Ctrl+C)
+```
+
+이 상태에서 해당 채널의 스레드에 `:rocket:`을 달아 답글이 오는지 확인합니다.
+
+### 5. 상시 실행 등록 (launchd)
+
+터미널을 닫아도 계속 살아있고, 프로세스가 죽으면 자동 재시작됩니다.
+
+```bash
+# 저장소 경로를 plist 에 반영
+sed -i '' "s|__REPO_DIR__|$PWD|g" com.wanted.tcauto.slack.plist
+
+# 등록 및 시작
+cp com.wanted.tcauto.slack.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/com.wanted.tcauto.slack.plist
+
+# 상태 확인
+launchctl list | grep tcauto
+
+# 로그 확인
+tail -f logs/slack_listener.out
+
+# 중지
+launchctl unload -w ~/Library/LaunchAgents/com.wanted.tcauto.slack.plist
+```
+
+### 6. 동작 방식과 주의사항
+
+| 항목 | 동작 |
+|---|---|
+| **트리거 범위** | 지정한 채널 + 지정한 이모지 + (설정 시) 허용된 사용자만 |
+| **동시 실행** | 파일 락으로 차단. 실행 중 이모지를 달면 "이미 진행 중" 안내만 남김 |
+| **중복 이벤트** | 같은 이벤트가 재전달되면 무시 (이모지를 떼고 다시 달면 재실행됨) |
+| **절전 방지** | `caffeinate -i -s`로 감싸 실행 중 Mac이 잠들지 않게 함 |
+| **타임아웃** | 기본 2시간 초과 시 프로세스 그룹 종료 후 스레드에 보고 |
+| **민감정보** | 스레드에 올리는 모든 텍스트·첨부 로그에서 이메일·비밀번호·토큰·세션 쿠키 값을 마스킹 |
+| **자동 푸시** | 재생성이 있었고 최종 실패가 0건이면 `TCAUTO_PUSH_BRANCH`에 커밋·푸시하고 결과 답글에 커밋 해시를 표시 |
+
+> **노트북 뚜껑을 닫으면 중단됩니다.** `caffeinate`는 유휴 절전만 막습니다. 24시간 무인 운영이 필요하면 GitHub Actions 방식(`repository_dispatch`)으로 옮기는 것을 검토하세요.
+
+### 7. 문제 해결
+
+| 증상 | 확인 |
+|---|---|
+| 이모지를 달아도 반응 없음 | 봇이 채널에 초대되어 있는지 (`/invite @앱이름`), `SLACK_TRIGGER_CHANNELS`의 채널 ID가 맞는지, `logs/slack_listener.out` 확인 |
+| `not_in_channel` 오류 | 봇을 해당 채널에 초대 |
+| `missing_scope` 오류 | 위 Scope 표를 다시 확인하고 앱 재설치 |
+| 재생성이 항상 실패 | `.env`에 `CLAUDE_CODE_OAUTH_TOKEN`이 있는지 확인 (launchd는 셸 프로필을 읽지 않음) |
+| `git push` 실패 | launchd 환경의 자격증명 문제. `TCAUTO_AUTO_PUSH=0`으로 끄거나 keychain helper 설정 |
+
+---
+
 ## 🐛 문제 해결
 
 ### Claude Code 토큰 만료
@@ -334,7 +505,9 @@ sheets-automation/
 │       └── test_{기능영역}_{NNN}_{success|failed}.py
 ├── screenshots/                # 테스트 스크린샷
 ├── logs/                       # 실패한 케이스 로그 (run_all_tests.py 실행 시 생성)
-│   └── failed_RESUME_006.log   # 실패 사유 포함
+│   ├── failed_RESUME_006.log   # 실패 사유 포함
+│   ├── run_summary.json        # 실행 결과 요약 (Slack 리스너가 읽음)
+│   └── slack_listener.out      # Slack 리스너 로그 (launchd 실행 시)
 ├── work/                       # 로그인 세션 파일
 │   └── auth_state.json         # 로그인 세션 저장 파일
 ├── .github/
@@ -344,6 +517,8 @@ sheets-automation/
 ├── run_automation.py           # 전체 자동화 메인 스크립트
 ├── run_all_tests.py            # 전체 테스트 순차 실행 + 결과 요약
 ├── download_tc.py              # Google Drive TC 다운로드
+├── slack_listener.py           # Slack 이모지 트리거 리스너 (Socket Mode)
+├── com.wanted.tcauto.slack.plist  # 리스너 상시 실행용 launchd 설정
 ├── system_prompt.txt           # Claude 시스템 프롬프트 (코드 작성 규칙 포함)
 ├── test_cases.json             # 다운로드된 TC
 ├── pytest.ini                  # pytest 설정

@@ -7,3 +7,5 @@ gspread==5.12.0
 google-auth==2.41.1
 google-auth-oauthlib==1.2.3
 requests==2.31.0
+slack-bolt==1.18.1
+slack-sdk==3.27.1

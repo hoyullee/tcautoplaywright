@@ -10,3 +10,6 @@ test_results/
 
 # 로그 파일 제외 (선택사항)
 logs/
+
+# Slack 리스너 실행 락 파일
+work/.tcauto_run.lock

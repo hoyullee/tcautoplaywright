@@ -1,12 +1,21 @@
 import json
+import os
 import subprocess
 import sys
 import glob
+import time
 from pathlib import Path
 
 LOGS_DIR = Path('logs')
 TC_JSON = Path('test_cases.json')
 MAX_RETRIES = 3
+
+# 실행 결과 요약 파일 (slack_listener.py 등 외부에서 파싱)
+SUMMARY_PATH = LOGS_DIR / 'run_summary.json'
+
+# 재생성 성공 시 자동 커밋·푸시 여부 (TCAUTO_AUTO_PUSH=0 이면 비활성화)
+AUTO_PUSH = os.getenv('TCAUTO_AUTO_PUSH', '1').lower() not in ('0', 'false', 'no')
+PUSH_BRANCH = os.getenv('TCAUTO_PUSH_BRANCH', 'master')
 
 
 def load_tc_order():
@@ -82,6 +91,8 @@ def clear_logs():
     if LOGS_DIR.exists():
         for f in LOGS_DIR.glob('*.log'):
             f.unlink()
+    if SUMMARY_PATH.exists():
+        SUMMARY_PATH.unlink()
 
 
 def run_test_with_retry(test_file, tc_id):
@@ -112,10 +123,20 @@ def regenerate_tc(tc_id):
 
 
 def git_commit_and_push(regenerated_tc_ids):
-    """재생성된 테스트 스크립트를 master 브랜치에 자동 커밋·푸시"""
+    """재생성된 테스트 스크립트를 PUSH_BRANCH 브랜치에 자동 커밋·푸시
+
+    반환: {'pushed': bool, 'branch': str, 'commit': str, 'detail': str}
+    """
+    info = {'pushed': False, 'branch': PUSH_BRANCH, 'commit': '', 'detail': ''}
+
     print(f"\n{'='*60}")
     print("📦 Git 자동 커밋·푸시")
     print(f"{'='*60}")
+
+    if not AUTO_PUSH:
+        print("ℹ️  TCAUTO_AUTO_PUSH=0 — 자동 커밋·푸시 비활성화 상태")
+        info['detail'] = '자동 푸시 비활성화(TCAUTO_AUTO_PUSH=0)'
+        return info
 
     # 변경된 test/ 파일이 실제로 있는지 확인
     diff = subprocess.run(
@@ -130,7 +151,8 @@ def git_commit_and_push(regenerated_tc_ids):
 
     if not changed_files:
         print("ℹ️  test/ 디렉토리에 변경된 파일 없음 — 커밋 스킵")
-        return
+        info['detail'] = '변경된 test/ 파일 없음'
+        return info
 
     print(f"변경 파일:\n{changed_files}\n")
 
@@ -139,8 +161,8 @@ def git_commit_and_push(regenerated_tc_ids):
 
     steps = [
         (['git', 'add', 'test/'], "git add test/"),
-        (['git', 'commit', '-m', commit_msg], f"git commit"),
-        (['git', 'push', 'origin', 'master'], "git push origin master"),
+        (['git', 'commit', '-m', commit_msg], "git commit"),
+        (['git', 'push', 'origin', PUSH_BRANCH], f"git push origin {PUSH_BRANCH}"),
     ]
 
     for cmd, label in steps:
@@ -149,10 +171,46 @@ def git_commit_and_push(regenerated_tc_ids):
             print(f"✅ {label}")
         else:
             print(f"❌ {label} 실패:\n{result.stderr.strip()}")
-            break
+            info['detail'] = f"{label} 실패: {result.stderr.strip()[:200]}"
+            return info
+
+    sha = subprocess.run(
+        ['git', 'rev-parse', '--short', 'HEAD'],
+        capture_output=True, text=True, cwd='.'
+    )
+    info['pushed'] = True
+    info['commit'] = sha.stdout.strip()
+    info['detail'] = f"{PUSH_BRANCH} 브랜치에 푸시 완료"
+    return info
+
+
+def write_summary(total, success_list, failed_list, regenerated_ids, push_info, started_at):
+    """실행 결과를 기계 판독용 JSON으로 저장 (Slack 리스너 등에서 사용)"""
+    LOGS_DIR.mkdir(exist_ok=True)
+    summary = {
+        'started_at': started_at,
+        'finished_at': time.time(),
+        'total': total,
+        'success_count': len(success_list),
+        'failed_count': len(failed_list),
+        'success': [{'tc_id': tc_id, 'note': note} for tc_id, note in success_list],
+        'failed': [
+            {'tc_id': tc_id, 'reason': reason, 'log': str(log_path)}
+            for tc_id, reason, log_path in failed_list
+        ],
+        'regenerated': regenerated_ids,
+        'push': push_info,
+    }
+    try:
+        with open(SUMMARY_PATH, 'w', encoding='utf-8') as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"⚠️  요약 파일 저장 실패: {e}")
+    return summary
 
 
 def main():
+    started_at = time.time()
     clear_logs()
     tc_order = load_tc_order()
 
@@ -164,6 +222,7 @@ def main():
 
     if not test_files:
         print("❌ 실행할 테스트 파일이 없습니다.")
+        write_summary(0, [], [], [], {'pushed': False, 'detail': '실행할 테스트 없음'}, started_at)
         sys.exit(1)
 
     total = len(test_files)
@@ -241,10 +300,16 @@ def main():
             print(f"           {log_path}")
 
     # 재생성이 1회라도 있었고, 최종 실패 케이스가 없을 때만 커밋·푸시
+    push_info = {'pushed': False, 'branch': PUSH_BRANCH, 'commit': '', 'detail': ''}
     if regenerated_ids and not failed_list:
-        git_commit_and_push(regenerated_ids)
+        push_info = git_commit_and_push(regenerated_ids)
     elif regenerated_ids and failed_list:
         print("\nℹ️  실패한 케이스가 있어 Git 커밋·푸시를 건너뜁니다.")
+        push_info['detail'] = '실패 케이스 존재로 푸시 건너뜀'
+    else:
+        push_info['detail'] = '재생성 없음'
+
+    write_summary(total, success_list, failed_list, regenerated_ids, push_info, started_at)
 
     print()
 

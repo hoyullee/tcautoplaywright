@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TC 자동화 Slack 리스너 — launchd 상시 실행 설정
+
+  설치 방법:
+    1. 아래 __REPO_DIR__ 을 저장소 절대경로로 모두 바꾼다.
+       예) sed -i '' "s|__REPO_DIR__|$PWD|g" com.wanted.tcauto.slack.plist
+    2. cp com.wanted.tcauto.slack.plist ~/Library/LaunchAgents/
+    3. launchctl load -w ~/Library/LaunchAgents/com.wanted.tcauto.slack.plist
+
+  상태 확인 : launchctl list | grep tcauto
+  중지      : launchctl unload -w ~/Library/LaunchAgents/com.wanted.tcauto.slack.plist
+  로그      : logs/slack_listener.out / logs/slack_listener.err
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wanted.tcauto.slack</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO_DIR__/venv/bin/python</string>
+        <string>-u</string>
+        <string>__REPO_DIR__/slack_listener.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_DIR__</string>
+
+    <!-- 로그인 시 자동 실행 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 프로세스가 죽으면 자동 재시작 -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 재시작 폭주 방지 (초) -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_DIR__/logs/slack_listener.out</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_DIR__/logs/slack_listener.err</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd 는 셸 프로필을 읽지 않으므로 PATH 를 직접 지정한다.
+             git / caffeinate / claude CLI 를 찾기 위해 필요하다. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>LANG</key>
+        <string>ko_KR.UTF-8</string>
+    </dict>
+</dict>
+</plist>
