@@ -21,130 +21,80 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 채용 홈으로 이동
+            # 채용 홈 접속
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
             await page.wait_for_timeout(3000)
 
-            # '~포지션 어때요?' 섹션 찾기: '포지션 어때요' 텍스트를 포함한 섹션 탐색
+            # 인앱 메시지(브레이즈) 오버레이 제거 (클릭 가로채는 경우 방지)
+            await page.evaluate("""() => {
+                document.querySelectorAll('.ab-in-app-message, [class*="ab-in-app"]').forEach(el => el.remove());
+            }""")
+
+            # '~포지션 어때요?' 문구를 포함하는 섹션(article) 찾기
             section_info = await page.evaluate("""() => {
-                const allElems = [...document.querySelectorAll('h2, h3, h4, section, div')];
-                const result = [];
-                for (const el of allElems) {
-                    const text = el.textContent.trim();
-                    if (text.includes('포지션 어때요') && text.length < 100) {
-                        result.push({
-                            tag: el.tagName,
-                            text: text.slice(0, 80),
-                            className: el.className ? el.className.slice(0, 80) : ''
-                        });
-                        if (result.length >= 5) break;
+                const articles = document.querySelectorAll('article');
+                for (const article of articles) {
+                    if (article.textContent.includes('포지션 어때요?')) {
+                        const rect = article.getBoundingClientRect();
+                        const absoluteTop = window.scrollY + rect.top;
+                        return { absoluteTop: Math.round(absoluteTop), text: article.textContent.slice(0, 50) };
                     }
                 }
-                return result;
+                return null;
             }""")
-            print(f"'포지션 어때요' 섹션 정보: {section_info}")
 
-            # '전체보기' 버튼과 '포지션 어때요' 섹션 연관 정보 탐색
-            btn_info = await page.evaluate("""() => {
-                const allElems = [...document.querySelectorAll('a, button')];
-                const result = [];
-                for (const el of allElems) {
-                    const text = el.textContent.trim();
-                    if (text === '전체보기' || text.includes('전체 보기')) {
-                        const parent = el.closest('section') || el.closest('[class*="section"]') || el.parentElement;
-                        const parentText = parent ? parent.textContent.trim().slice(0, 100) : '';
-                        if (parentText.includes('포지션 어때요')) {
-                            result.push({
-                                tag: el.tagName,
-                                text: text,
-                                href: el.getAttribute('href') || '',
-                                target: el.getAttribute('target') || '',
-                                parentText: parentText.slice(0, 80)
-                            });
+            assert section_info is not None, "'~포지션 어때요?' 섹션을 찾을 수 없음"
+            print(f"찾은 섹션: {section_info['text']}")
+
+            # 섹션이 뷰포트 중간에 오도록 스크롤
+            target_scroll = max(0, section_info['absoluteTop'] - 200)
+            await page.evaluate(f"window.scrollTo(0, {target_scroll})")
+            await page.wait_for_timeout(1500)
+
+            # '전체보기' 버튼(링크) href 확인 (예상 URL 패턴: /tags/{url})
+            more_href = await page.evaluate("""() => {
+                const articles = document.querySelectorAll('article');
+                for (const article of articles) {
+                    if (article.textContent.includes('포지션 어때요?')) {
+                        const links = article.querySelectorAll('a');
+                        for (const link of links) {
+                            if (link.textContent.includes('전체보기') || link.textContent.includes('전체 보기')) {
+                                return link.href;
+                            }
                         }
                     }
                 }
-                return result;
+                return null;
             }""")
-            print(f"'포지션 어때요' 섹션 내 전체보기 버튼: {btn_info}")
 
-            # '포지션 어때요' 텍스트가 포함된 섹션 찾기
-            section_heading = page.locator('h2, h3, h4').filter(has_text='포지션 어때요').first
-            section_heading_count = await section_heading.count()
-            print(f"섹션 헤딩 개수: {section_heading_count}")
+            assert more_href is not None, "'전체보기' 버튼을 찾을 수 없음"
+            print(f"'전체보기' 버튼 href: {more_href}")
 
-            # 섹션으로 스크롤 후 전체보기 버튼 찾기
-            if section_heading_count > 0:
-                await section_heading.scroll_into_view_if_needed()
-                await page.wait_for_timeout(1000)
+            before_url = page.url
 
-                # 섹션 헤딩 주변의 전체보기 버튼 찾기
-                section_container = page.locator('section, div').filter(has_text='포지션 어때요').filter(has=page.locator('a, button').filter(has_text='전체보기')).first
-                view_all_btn = section_container.locator('a, button').filter(has_text='전체보기').first
-            else:
-                # 일반적인 전체보기 버튼 중 tags URL 패턴 확인
-                view_all_btn = page.locator('a').filter(has_text='전체보기').first
+            more_locator = page.locator(f'a[href="{more_href.replace("https://www.wanted.co.kr", "")}"]').first
+            if await more_locator.count() == 0:
+                more_locator = page.locator(f'a[href="{more_href}"]').first
 
-            view_all_count = await view_all_btn.count()
-            print(f"전체보기 버튼 개수: {view_all_count}")
+            await more_locator.scroll_into_view_if_needed(timeout=5000)
+            await more_locator.click(timeout=5000)
+            await page.wait_for_load_state('domcontentloaded', timeout=15000)
+            await page.wait_for_timeout(1500)
 
-            if view_all_count == 0:
-                # 전체보기 링크 중 /tags/ URL을 가진 것 찾기
-                all_view_btns = await page.evaluate("""() => {
-                    const elems = [...document.querySelectorAll('a, button')];
-                    return elems
-                        .filter(el => el.textContent.trim() === '전체보기' || el.textContent.trim() === '전체 보기')
-                        .map(el => ({
-                            tag: el.tagName,
-                            text: el.textContent.trim(),
-                            href: el.getAttribute('href') || '',
-                            target: el.getAttribute('target') || ''
-                        }));
-                }""")
-                print(f"모든 전체보기 버튼: {all_view_btns}")
+            current_url = page.url
+            print(f"이동된 URL: {current_url}")
 
-                # /tags/ URL을 가진 버튼 찾기
-                tags_btn = next((b for b in all_view_btns if '/tags/' in b.get('href', '')), None)
-                if tags_btn:
-                    view_all_btn = page.locator(f'a[href="{tags_btn["href"]}"]').filter(has_text='전체보기').first
-                    if await view_all_btn.count() == 0:
-                        view_all_btn = page.locator(f'a[href*="/tags/"]').filter(has_text='전체보기').first
+            assert current_url != before_url, "'전체보기' 클릭 후 페이지 URL이 변경되지 않음"
+            assert '/tags/' in current_url, f"기대한 태그 페이지로 이동되지 않음. 현재 URL: {current_url}"
+            print("✓ '전체보기' 버튼 클릭 시 태그 페이지로 이동 확인")
 
-            await view_all_btn.scroll_into_view_if_needed()
-            await page.wait_for_timeout(500)
-
-            href = await view_all_btn.get_attribute('href')
-            target = await view_all_btn.get_attribute('target')
-            print(f"전체보기 버튼 href: {href}, target: {target}")
-
-            # 클릭 처리 - 새 탭 여부 확인
-            if target == '_blank':
-                async with context.expect_page() as new_page_info:
-                    await view_all_btn.click()
-                new_page = await new_page_info.value
-                await new_page.wait_for_load_state('domcontentloaded')
-                await new_page.wait_for_timeout(2000)
-                current_url = new_page.url
-                print(f"새 탭 URL: {current_url}")
-                assert '/tags/' in current_url or 'wanted.co.kr' in current_url, \
-                    f"기대하는 페이지로 이동되지 않음. 현재 URL: {current_url}"
-                await new_page.screenshot(path='screenshots/test_25_success.png')
-            else:
-                await view_all_btn.click()
-                await page.wait_for_load_state('domcontentloaded')
-                await page.wait_for_timeout(2000)
-                current_url = page.url
-                print(f"이동 후 URL: {current_url}")
-                assert '/tags/' in current_url or 'wanted.co.kr' in current_url, \
-                    f"기대하는 페이지로 이동되지 않음. 현재 URL: {current_url}"
-                await page.screenshot(path='screenshots/test_25_success.png')
-
+            await page.screenshot(path='screenshots/test_20_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_25_failed.png')
+            await page.screenshot(path='screenshots/test_20_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -21,6 +21,12 @@ async def test_main():
             # 채용 홈 접속
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(1500)
+
+            # 인앱 메시지(브레이즈) 팝업이 뜨는 경우 화면을 가려 클릭이 막히므로 닫기 처리
+            if await page.locator('iframe.ab-in-app-message').count() > 0:
+                await page.keyboard.press('Escape')
+                await page.wait_for_timeout(500)
 
             # '한 번쯤 가보고 싶은 회사' 섹션 찾기
             section_title = page.get_by_text('한 번쯤 가보고 싶은 회사')

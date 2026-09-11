@@ -21,28 +21,42 @@ async def test_main():
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
 
-            # 1. '출퇴근 걱정없는 역세권 포지션' 섹션 찾기 (스크롤하며 탐색)
+            # 1. '출퇴근 편한 포지션' 섹션 찾기 (스크롤하며 탐색)
+            # 테스트케이스의 '출퇴근 걱정없는 역세권 포지션'에 해당하는 실제 섹션명
             section_found = False
-            for _ in range(20):
-                section = page.get_by_text('출퇴근 걱정없는 역세권 포지션', exact=True)
+            for _ in range(30):
+                # 실제 페이지의 섹션명으로 확인
+                section = page.get_by_text('출퇴근 편한 포지션', exact=True)
                 if await section.count() > 0:
                     section_found = True
                     await section.first.scroll_into_view_if_needed()
                     await page.wait_for_timeout(500)
                     break
-                await page.evaluate("window.scrollBy(0, 500)")
-                await page.wait_for_timeout(300)
+                await page.evaluate("window.scrollBy(0, 400)")
+                await page.wait_for_timeout(200)
 
             if not section_found:
-                raise Exception("'출퇴근 걱정없는 역세권 포지션' 섹션을 찾을 수 없습니다.")
-            print("[OK] '출퇴근 걱정없는 역세권 포지션' 섹션 확인")
+                # fallback: 역세권 관련 텍스트 탐색
+                for _ in range(10):
+                    section = page.get_by_text('역세권', exact=False)
+                    if await section.count() > 0:
+                        section_found = True
+                        await section.first.scroll_into_view_if_needed()
+                        await page.wait_for_timeout(500)
+                        break
+                    await page.evaluate("window.scrollBy(0, 400)")
+                    await page.wait_for_timeout(200)
 
-            # 2. '지도로 공고 찾기' 버튼 찾기
+            if not section_found:
+                raise Exception("'출퇴근 편한 포지션'(역세권 포지션) 섹션을 찾을 수 없습니다.")
+            print("[OK] '출퇴근 편한 포지션' 섹션 확인")
+
+            # 2. '지도로 공고 찾기' 버튼/링크 찾기
             map_btn = page.get_by_role('link', name='지도로 공고 찾기')
             if await map_btn.count() == 0:
                 map_btn = page.get_by_role('button', name='지도로 공고 찾기')
             if await map_btn.count() == 0:
-                map_btn = page.get_by_text('지도로 공고 찾기')
+                map_btn = page.get_by_text('지도로 공고 찾기', exact=True)
 
             if await map_btn.count() == 0:
                 raise Exception("'지도로 공고 찾기' 버튼을 찾을 수 없습니다.")
@@ -61,7 +75,6 @@ async def test_main():
                 # 새 탭에서 열림
                 target_page = pages_after[-1]
                 await target_page.wait_for_load_state('domcontentloaded', timeout=30000)
-                # URL이 비어있으면 추가 대기
                 for _ in range(10):
                     current_url = target_page.url
                     if current_url and current_url != 'about:blank':

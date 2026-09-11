@@ -26,6 +26,16 @@ async def test_main():
             await page.wait_for_load_state('domcontentloaded')
             await page.wait_for_timeout(3000)
 
+            # 마케팅 인앱 메시지(Braze) 팝업이 전체 화면을 덮어 클릭을 가로채는 경우가 있어 닫기 처리
+            try:
+                iam_iframe = page.locator('iframe.ab-in-app-message')
+                if await iam_iframe.count() > 0 and await iam_iframe.is_visible():
+                    close_btn = page.frame_locator('iframe.ab-in-app-message').locator('.close')
+                    await close_btn.click(timeout=3000)
+                    await page.wait_for_timeout(500)
+            except Exception:
+                pass
+
             # '최근 본 포지션' 섹션 확인 및 스크롤
             recently_viewed = page.locator('article').filter(
                 has=page.locator('h1, h2, h3, h4, h5, h6, strong, span, p').filter(has_text='최근 본 포지션')
@@ -47,7 +57,7 @@ async def test_main():
             if await view_all_btn.count() == 0:
                 raise Exception("'최근 본 포지션' 섹션의 '전체보기' 버튼을 찾을 수 없습니다")
 
-            await view_all_btn.first.scroll_into_view_if_needed()
+            await view_all_btn.first.evaluate("el => el.scrollIntoView({block: 'center', inline: 'center'})")
             await page.wait_for_timeout(500)
             await view_all_btn.first.click()
 

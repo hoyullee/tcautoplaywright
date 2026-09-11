@@ -21,97 +21,39 @@ async def test_main():
             # 채용 홈 접속
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(1500)
 
-            # '지금 주목할 소식' 섹션 타이틀 찾기
-            section_title = page.get_by_text('지금 주목할 소식', exact=True)
-            await section_title.wait_for(state='visible', timeout=15000)
+            # 인앱 메시지(브레이즈) 팝업이 뜨는 경우 화면을 가려 클릭이 막히므로 닫기 처리
+            if await page.locator('iframe.ab-in-app-message').count() > 0:
+                await page.keyboard.press('Escape')
+                await page.wait_for_timeout(500)
 
-            # 섹션으로 스크롤
-            await section_title.scroll_into_view_if_needed()
+            # '지금 주목할 소식' 섹션(article) 찾기 - 해당 heading을 포함하는 article 컨테이너
+            section = page.locator('article').filter(
+                has=page.get_by_role('heading', name='지금 주목할 소식')
+            ).first
+            await section.wait_for(state='visible', timeout=15000)
+            await section.scroll_into_view_if_needed()
             await page.wait_for_timeout(800)
 
             print("1. '지금 주목할 소식' 텍스트 노출 확인 완료")
 
-            # 좌/우 이동 버튼 확인 (aria-label '이전', '다음' 버튼)
-            nav_buttons_info = await page.evaluate("""() => {
-                const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                for (const el of allElements) {
-                    const text = el.textContent.trim();
-                    if (text === '지금 주목할 소식') {
-                        let container = el;
-                        for (let i = 0; i < 10; i++) {
-                            container = container.parentElement;
-                            if (!container) break;
+            # 좌/우 이동 버튼 확인 (섹션 내 '이전'/'다음' 버튼)
+            prev_btn = section.get_by_role('button', name='이전')
+            next_btn = section.get_by_role('button', name='다음')
 
-                            const buttons = [...container.querySelectorAll('button')].slice(0, 30);
-                            const visibleBtns = buttons.filter(btn => {
-                                const rect = btn.getBoundingClientRect();
-                                return rect.width > 0 && rect.height > 0;
-                            });
+            await next_btn.wait_for(state='visible', timeout=10000)
+            prev_count = await prev_btn.count()
+            next_count = await next_btn.count()
 
-                            if (visibleBtns.length >= 2) {
-                                return {
-                                    count: visibleBtns.length,
-                                    buttons: visibleBtns.map(btn => ({
-                                        ariaLabel: btn.getAttribute('aria-label') || '',
-                                        disabled: btn.disabled,
-                                        className: btn.className.slice(0, 100)
-                                    }))
-                                };
-                            }
-                        }
-                        break;
-                    }
-                }
-                return { count: 0, buttons: [] };
-            }""")
+            if prev_count == 0 or next_count == 0:
+                raise Exception(f"좌/우 이동 버튼을 찾을 수 없습니다. 이전 버튼: {prev_count}개, 다음 버튼: {next_count}개")
 
-            print(f"Nav buttons: {nav_buttons_info}")
+            print("2. 좌/우 이동 버튼 노출 확인 완료 (이전/다음)")
 
-            if nav_buttons_info.get('count', 0) < 2:
-                raise Exception(f"좌/우 이동 버튼이 2개 미만입니다. 발견된 버튼 수: {nav_buttons_info.get('count', 0)}")
-
-            print(f"2. 좌/우 이동 버튼 {nav_buttons_info['count']}개 확인 완료 (이전/다음)")
-
-            # 컨텐츠 카드 3개 이상 확인
-            cards_count = await page.evaluate("""() => {
-                const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                for (const el of allElements) {
-                    const text = el.textContent.trim();
-                    if (text === '지금 주목할 소식') {
-                        let container = el;
-                        for (let i = 0; i < 10; i++) {
-                            container = container.parentElement;
-                            if (!container) break;
-
-                            // ul > li 카드 구조 탐색
-                            const listItems = container.querySelectorAll('ul > li');
-                            const visibleItems = [...listItems].slice(0, 50).filter(item => {
-                                const rect = item.getBoundingClientRect();
-                                return rect.width > 50 && rect.height > 50;
-                            });
-
-                            if (visibleItems.length >= 3) {
-                                return visibleItems.length;
-                            }
-
-                            // article 구조
-                            const articles = container.querySelectorAll('article');
-                            const visibleArticles = [...articles].slice(0, 50).filter(a => {
-                                const rect = a.getBoundingClientRect();
-                                return rect.width > 50 && rect.height > 50;
-                            });
-
-                            if (visibleArticles.length >= 3) {
-                                return visibleArticles.length;
-                            }
-                        }
-                        break;
-                    }
-                }
-                return 0;
-            }""")
-
+            # 컨텐츠 카드 3개 이상 확인 (ul > li 구조)
+            cards = section.locator('ul > li')
+            cards_count = await cards.count()
             print(f"Cards count: {cards_count}")
 
             if cards_count < 3:
@@ -119,199 +61,38 @@ async def test_main():
 
             print(f"3. 컨텐츠 카드 {cards_count}개 확인 완료 (3개 이상)")
 
-            # 슬라이더 컨테이너의 초기 transform/scroll 상태 기록
-            initial_state = await page.evaluate("""() => {
-                const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                for (const el of allElements) {
-                    const text = el.textContent.trim();
-                    if (text === '지금 주목할 소식') {
-                        let container = el;
-                        for (let i = 0; i < 10; i++) {
-                            container = container.parentElement;
-                            if (!container) break;
+            # '다음' 버튼이 비활성화 상태이면 클릭 불가하므로 확인
+            next_disabled = await next_btn.is_disabled()
+            print(f"'다음' 버튼 disabled 상태: {next_disabled}")
 
-                            // 슬라이드 래퍼 (transform 적용된 요소)
-                            const allChildren = [...container.querySelectorAll('*')].slice(0, 100);
-                            for (const child of allChildren) {
-                                const style = window.getComputedStyle(child);
-                                const transform = style.transform || '';
-                                const overflowX = style.overflowX || '';
-                                if (transform !== 'none' && transform !== '' && transform.includes('matrix')) {
-                                    return {
-                                        type: 'transform',
-                                        transform,
-                                        tag: child.tagName,
-                                        className: child.className.slice(0, 100)
-                                    };
-                                }
-                                if (overflowX === 'hidden' || overflowX === 'scroll') {
-                                    return {
-                                        type: 'overflow',
-                                        scrollLeft: child.scrollLeft,
-                                        scrollWidth: child.scrollWidth,
-                                        clientWidth: child.clientWidth,
-                                        tag: child.tagName
-                                    };
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
-                return { type: 'unknown' };
-            }""")
-
-            print(f"Initial slider state: {initial_state}")
-
-            # '다음' 버튼 클릭
-            next_btn = page.get_by_role('button', name='다음')
-            next_btn_count = await next_btn.count()
-            print(f"'다음' 버튼 개수: {next_btn_count}")
-
-            if next_btn_count == 0:
-                raise Exception("'다음' 버튼을 찾을 수 없습니다")
-
-            # 섹션 근처의 '다음' 버튼 선택 (섹션 타이틀 위치 기반)
-            section_box = await section_title.bounding_box()
-            best_btn = None
-            min_distance = float('inf')
-
-            for i in range(next_btn_count):
-                btn = next_btn.nth(i)
-                box = await btn.bounding_box()
-                if box and section_box:
-                    distance = abs(box['y'] - section_box['y'])
-                    if distance < min_distance:
-                        min_distance = distance
-                        best_btn = btn
-
-            if best_btn is None:
-                raise Exception("섹션 근처의 '다음' 버튼을 찾을 수 없습니다")
-
-            # 버튼 클릭 전 상태 확인
-            is_disabled = await best_btn.is_disabled()
-            print(f"'다음' 버튼 disabled 상태: {is_disabled}")
-
-            if is_disabled:
+            if next_disabled:
                 raise Exception("'다음' 버튼이 비활성화 상태입니다 - 클릭 불가")
 
-            # 클릭 전 첫 번째 카드의 위치 기록
-            first_card_pos_before = await page.evaluate("""() => {
-                const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                for (const el of allElements) {
-                    const text = el.textContent.trim();
-                    if (text === '지금 주목할 소식') {
-                        let container = el;
-                        for (let i = 0; i < 10; i++) {
-                            container = container.parentElement;
-                            if (!container) break;
-                            const listItems = container.querySelectorAll('ul > li');
-                            if (listItems.length > 0) {
-                                const rect = listItems[0].getBoundingClientRect();
-                                return { x: rect.x, y: rect.y };
-                            }
-                        }
-                        break;
-                    }
-                }
-                return null;
-            }""")
+            # 클릭 전 첫 번째 카드 위치 및 '이전' 버튼 활성화 상태 기록
+            first_card_x_before = (await cards.first.bounding_box())['x']
+            prev_disabled_before = await prev_btn.is_disabled()
+            print(f"First card x before: {first_card_x_before}, prev disabled before: {prev_disabled_before}")
 
-            print(f"First card position before click: {first_card_pos_before}")
+            # '다음' 버튼 클릭 (우측 이동)
+            await next_btn.scroll_into_view_if_needed()
+            await next_btn.click()
+            await page.wait_for_timeout(1200)
 
-            # '다음' 버튼 클릭
-            await best_btn.click()
-            await page.wait_for_timeout(1000)
+            # 클릭 후 첫 번째 카드 위치 및 '이전' 버튼 활성화 상태 확인
+            first_card_x_after = (await cards.first.bounding_box())['x']
+            prev_disabled_after = await prev_btn.is_disabled()
+            print(f"First card x after: {first_card_x_after}, prev disabled after: {prev_disabled_after}")
 
-            # 클릭 후 첫 번째 카드 위치 확인 (이동 여부 확인)
-            first_card_pos_after = await page.evaluate("""() => {
-                const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                for (const el of allElements) {
-                    const text = el.textContent.trim();
-                    if (text === '지금 주목할 소식') {
-                        let container = el;
-                        for (let i = 0; i < 10; i++) {
-                            container = container.parentElement;
-                            if (!container) break;
-                            const listItems = container.querySelectorAll('ul > li');
-                            if (listItems.length > 0) {
-                                const rect = listItems[0].getBoundingClientRect();
-                                return { x: rect.x, y: rect.y };
-                            }
-                        }
-                        break;
-                    }
-                }
-                return null;
-            }""")
-
-            print(f"First card position after click: {first_card_pos_after}")
-
-            # 슬라이더 이동 검증: x 좌표 변화 또는 scrollLeft 변화
-            scroll_verified = False
-
-            if first_card_pos_before and first_card_pos_after:
-                x_diff = abs(first_card_pos_after['x'] - first_card_pos_before['x'])
-                if x_diff > 10:
-                    print(f"4. 우측 버튼 클릭 후 카드 슬라이드 이동 확인 (x 이동량: {x_diff}px)")
-                    scroll_verified = True
+            x_diff = abs(first_card_x_after - first_card_x_before)
+            scroll_verified = x_diff > 5 or (prev_disabled_before and not prev_disabled_after)
 
             if not scroll_verified:
-                # scrollLeft 변화 확인
-                after_state = await page.evaluate("""() => {
-                    const allElements = document.querySelectorAll('h2, h3, h4, p, span, div');
-                    for (const el of allElements) {
-                        const text = el.textContent.trim();
-                        if (text === '지금 주목할 소식') {
-                            let container = el;
-                            for (let i = 0; i < 10; i++) {
-                                container = container.parentElement;
-                                if (!container) break;
-                                const allChildren = [...container.querySelectorAll('*')].slice(0, 100);
-                                for (const child of allChildren) {
-                                    const style = window.getComputedStyle(child);
-                                    const transform = style.transform || '';
-                                    if (transform !== 'none' && transform !== '' && transform.includes('matrix')) {
-                                        return { type: 'transform', transform };
-                                    }
-                                    if (child.scrollLeft > 0) {
-                                        return { type: 'scrollLeft', scrollLeft: child.scrollLeft };
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    return { type: 'unknown' };
-                }""")
+                raise Exception(
+                    f"우측 버튼 클릭 후 슬라이드 이동을 확인할 수 없습니다. "
+                    f"x 이동량: {x_diff}, 이전 버튼 disabled 변화: {prev_disabled_before} -> {prev_disabled_after}"
+                )
 
-                print(f"After slider state: {after_state}")
-
-                if after_state.get('type') in ['transform', 'scrollLeft']:
-                    print(f"4. 우측 버튼 클릭 후 슬라이드 이동 확인 ({after_state})")
-                    scroll_verified = True
-
-            if not scroll_verified:
-                # 이전 버튼 활성화 상태 확인 (이동했다면 이전 버튼이 활성화됨)
-                prev_btn = page.get_by_role('button', name='이전')
-                prev_count = await prev_btn.count()
-                if prev_count > 0:
-                    # 섹션 근처 이전 버튼
-                    for i in range(prev_count):
-                        btn = prev_btn.nth(i)
-                        box = await btn.bounding_box()
-                        if box and section_box:
-                            distance = abs(box['y'] - section_box['y'])
-                            if distance < 200:  # 섹션 타이틀 근처
-                                is_prev_disabled = await btn.is_disabled()
-                                print(f"'이전' 버튼 disabled 상태 (클릭 후): {is_prev_disabled}")
-                                if not is_prev_disabled:
-                                    print("4. 우측 버튼 클릭 후 '이전' 버튼이 활성화됨 - 슬라이드 이동 확인")
-                                    scroll_verified = True
-                                break
-
-            if not scroll_verified:
-                raise Exception("우측 버튼 클릭 후 슬라이드 이동을 확인할 수 없습니다")
+            print(f"4. 우측 버튼 클릭 후 카드가 우측으로 이동하며 추가 컨텐츠 카드 노출 확인 완료 (x 이동량: {x_diff}px)")
 
             await page.screenshot(path='screenshots/test_18_success.png')
             print("AUTOMATION_SUCCESS")

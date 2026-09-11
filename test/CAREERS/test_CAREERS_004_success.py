@@ -33,12 +33,14 @@ async def test_main():
             card_count = await position_cards.count()
             assert card_count > 0, "포지션 카드가 존재하지 않습니다."
 
-            # 첫 번째 포지션 카드 클릭
-            first_card = position_cards.first
+            # 첫 번째 포지션 카드의 href 가져오기
+            first_card = position_cards.nth(0)
             href = await first_card.get_attribute('href')
             print(f"선택된 포지션 링크: {href}")
 
-            await first_card.click()
+            # href로 직접 이동 (클릭 대신 goto 사용으로 strict 모드 문제 회피)
+            position_url = f"https://www.wanted.co.kr{href}"
+            await page.goto(position_url, timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
 
             # 포지션 상세 페이지 진입 확인

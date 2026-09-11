@@ -21,6 +21,12 @@ async def test_main():
             # 채용 홈 접속
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(1500)
+
+            # 인앱 메시지(브레이즈) 팝업이 뜨는 경우 화면을 가려 클릭이 막히므로 닫기 처리
+            if await page.locator('iframe.ab-in-app-message').count() > 0:
+                await page.keyboard.press('Escape')
+                await page.wait_for_timeout(500)
 
             # '합격 가능성 높은 포지션' 섹션 찾기
             section_header = page.get_by_text('합격 가능성 높은 포지션', exact=False)
@@ -51,10 +57,9 @@ async def test_main():
             await page.wait_for_timeout(500)
 
             # 클릭 및 페이지 이동 대기
-            async with page.expect_navigation(timeout=15000):
-                await view_all_link.first.click()
-
+            await view_all_link.first.click(timeout=10000)
             await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(1000)
 
             # 결과 URL 확인 - https://www.wanted.co.kr/matched 로 이동했는지 확인
             current_url = page.url

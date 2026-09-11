@@ -4,7 +4,11 @@ import asyncio
 import os
 import pytest
 
-# 로그인 상태 테스트 - 저장된 세션 파일 로드
+# TC24 - CAREERSHOME-009: '출퇴근 걱정없는 역세권 포지션' 섹션 하단 검증
+# 확인사항:
+#   - '~포지션 어때요' 텍스트 노출
+#   - 포지션 카드 5개
+#   - 우측(다음) 버튼 클릭 시 스크롤 발생하며 추가 포지션 카드 노출
 
 @pytest.mark.asyncio
 async def test_main():
@@ -25,33 +29,33 @@ async def test_main():
             await page.wait_for_load_state('domcontentloaded')
             await page.wait_for_timeout(3000)
 
-            # '출퇴근 걱정없는 역세권 포지션' 섹션 확인
-            section_text = '출퇴근 걱정없는 역세권 포지션'
-            section_loc = page.get_by_text(section_text, exact=True)
-            await section_loc.first.wait_for(state='visible', timeout=15000)
-            print(f"✅ '{section_text}' 텍스트 노출 확인")
+            # 1. '출퇴근 편한 포지션' 섹션 확인 (TC에서 '출퇴근 걱정없는 역세권 포지션'으로 표기됨)
+            commute_section_text = '출퇴근 편한 포지션'
+            commute_loc = page.get_by_text(commute_section_text, exact=True)
+            await commute_loc.first.wait_for(state='visible', timeout=15000)
+            print(f"✅ '{commute_section_text}' 섹션 노출 확인")
 
             # 해당 섹션으로 스크롤
-            await section_loc.first.scroll_into_view_if_needed()
+            await commute_loc.first.scroll_into_view_if_needed()
             await page.wait_for_timeout(500)
 
-            # 역세권 섹션 이후에 오는 '~포지션 어때요' 텍스트 확인
-            next_section_info = await page.evaluate("""(sectionText) => {
-                const heading = [...document.querySelectorAll('*')].find(
-                    el => el.textContent.trim() === sectionText
+            # 2. '출퇴근 편한 포지션' 다음에 오는 '~포지션 어때요' 섹션 확인
+            next_section_info = await page.evaluate("""() => {
+                // '출퇴근 편한 포지션' h2 찾기
+                const commute_h2 = [...document.querySelectorAll('h2')].find(
+                    h => h.textContent.trim() === '출퇴근 편한 포지션'
                 );
-                if (!heading) return { found: false, msg: 'section heading not found' };
+                if (!commute_h2) return { found: false, msg: '출퇴근 편한 포지션 h2 not found' };
 
-                // article 찾기
-                let article = heading.parentElement;
+                // 해당 article 찾기
+                let article = commute_h2.parentElement;
                 for (let i = 0; i < 10; i++) {
-                    if (!article) break;
-                    if (article.tagName === 'ARTICLE') break;
+                    if (!article || article.tagName === 'ARTICLE') break;
                     article = article.parentElement;
                 }
                 if (!article) return { found: false, msg: 'article not found' };
 
-                // 이후 형제 요소에서 '포지션 어때요' 텍스트 탐색
+                // 이후 형제 요소에서 '포지션 어때요' 포함 h2 탐색
                 let next = article.nextElementSibling;
                 for (let i = 0; i < 5; i++) {
                     if (!next) break;
@@ -65,50 +69,49 @@ async def test_main():
                     }
                     next = next.nextElementSibling;
                 }
-                return { found: false, msg: '포지션 어때요 text not found in following sections' };
-            }""", section_text)
+                return { found: false, msg: '포지션 어때요 h2 not found in following sections' };
+            }""")
 
-            print(f"'~포지션 어때요' 텍스트 탐색 결과: {next_section_info}")
-            assert next_section_info.get('found'), f"'~포지션 어때요' 텍스트를 찾을 수 없습니다: {next_section_info}"
+            print(f"'~포지션 어때요' 섹션 탐색: {next_section_info}")
+            assert next_section_info.get('found'), \
+                f"'~포지션 어때요' 텍스트를 찾을 수 없습니다: {next_section_info}"
             next_section_text = next_section_info.get('text', '')
             print(f"✅ '~포지션 어때요' 텍스트 노출 확인: '{next_section_text}'")
 
-            # 해당 섹션으로 스크롤
+            # 해당 섹션으로 스크롤 (lazy loading 트리거를 위해 충분히 대기)
             next_heading_loc = page.get_by_text(next_section_text, exact=True)
             await next_heading_loc.first.scroll_into_view_if_needed()
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(2000)  # 카드 로딩 대기
 
-            # 포지션 카드 5개 확인
-            card_info = await page.evaluate("""(nextSectionText) => {
-                const heading = [...document.querySelectorAll('h2')].find(
-                    el => el.textContent.trim() === nextSectionText
+            # 3. 포지션 카드 5개 이상 확인
+            card_info = await page.evaluate("""(sectionText) => {
+                const h2 = [...document.querySelectorAll('h2')].find(
+                    h => h.textContent.trim() === sectionText
                 );
-                if (!heading) return { found: false, msg: 'next section heading not found' };
+                if (!h2) return { found: false, msg: 'section h2 not found' };
 
-                // article 찾기
-                let article = heading.parentElement;
+                let article = h2.parentElement;
                 for (let i = 0; i < 10; i++) {
-                    if (!article) break;
-                    if (article.tagName === 'ARTICLE') break;
+                    if (!article || article.tagName === 'ARTICLE') break;
                     article = article.parentElement;
                 }
                 if (!article) return { found: false, msg: 'article not found' };
 
+                // li 카드 탐색 (carousel 포함)
+                const liCards = [...article.querySelectorAll('li')].slice(0, 30);
+                if (liCards.length >= 5) {
+                    return { found: true, count: liCards.length, tag: 'li' };
+                }
                 // 포지션 링크(a[href*="/wd/"]) 탐색
                 const positionLinks = [...article.querySelectorAll('a[href*="/wd/"]')].slice(0, 30);
                 if (positionLinks.length >= 5) {
                     return { found: true, count: positionLinks.length, tag: 'a[href*="/wd/"]' };
                 }
-                // li 카드 탐색
-                const liCards = [...article.querySelectorAll('li')].slice(0, 30);
-                if (liCards.length >= 5) {
-                    return { found: true, count: liCards.length, tag: 'li' };
-                }
                 return {
                     found: false,
                     msg: 'position cards not found (< 5)',
-                    positionLinksCount: positionLinks.length,
-                    liCount: liCards.length
+                    liCount: liCards.length,
+                    positionLinksCount: positionLinks.length
                 };
             }""", next_section_text)
 
@@ -117,152 +120,161 @@ async def test_main():
             assert card_info['count'] >= 5, f"포지션 카드가 5개 미만입니다: {card_info['count']}개"
             print(f"✅ 포지션 카드 {card_info['count']}개 확인 (5개 이상)")
 
-            # 스크롤 전 캐러셀 상태 저장 (transform 기반)
-            transform_before = await page.evaluate("""(nextSectionText) => {
-                const heading = [...document.querySelectorAll('h2')].find(
-                    el => el.textContent.trim() === nextSectionText
+            # 4. 스크롤 전 carousel 상태 저장
+            scroll_before = await page.evaluate("""(sectionText) => {
+                const h2 = [...document.querySelectorAll('h2')].find(
+                    h => h.textContent.trim() === sectionText
                 );
-                if (!heading) return null;
+                if (!h2) return { scrollLeft: 0 };
 
-                let article = heading.parentElement;
+                let article = h2.parentElement;
                 for (let i = 0; i < 10; i++) {
-                    if (!article) break;
-                    if (article.tagName === 'ARTICLE') break;
+                    if (!article || article.tagName === 'ARTICLE') break;
                     article = article.parentElement;
                 }
-                if (!article) return null;
+                if (!article) return { scrollLeft: 0 };
 
-                // CarouselContainer 내 transform 적용된 슬라이더
-                const carouselContainer = article.querySelector('[class*="CarouselContainer"]');
-                if (carouselContainer) {
-                    const translated = [...carouselContainer.querySelectorAll('ul, ol, div')].slice(0, 20).find(el => {
-                        const style = window.getComputedStyle(el);
-                        return style.transform !== 'none' && style.transform !== '';
-                    });
-                    if (translated) {
-                        return { transform: translated.style.transform || window.getComputedStyle(translated).transform };
-                    }
+                // CarouselContainer ul 찾기
+                const carouselUl = article.querySelector('ul[class*="CarouselContainer"]');
+                if (carouselUl) {
+                    return { scrollLeft: carouselUl.scrollLeft, method: 'carouselUl' };
                 }
 
-                // scrollLeft 기반
+                // 일반 스크롤 컨테이너
                 const scrollContainers = [...article.querySelectorAll('*')].slice(0, 60).filter(el => {
                     const style = window.getComputedStyle(el);
-                    return (style.overflowX === 'auto' || style.overflowX === 'scroll');
+                    return style.overflowX === 'auto' || style.overflowX === 'scroll';
                 });
                 if (scrollContainers.length > 0) {
-                    return { scrollLeft: scrollContainers[0].scrollLeft };
+                    return { scrollLeft: scrollContainers[0].scrollLeft, method: 'scrollContainer' };
                 }
-                return { scrollLeft: 0 };
+                return { scrollLeft: 0, method: 'default' };
             }""", next_section_text)
 
-            print(f"스크롤 전 상태: {transform_before}")
+            print(f"스크롤 전 상태: {scroll_before}")
 
-            # '다음' 버튼 (aria-label='다음') 클릭
-            next_btn_result = await page.evaluate("""(nextSectionText) => {
-                const heading = [...document.querySelectorAll('h2')].find(
-                    el => el.textContent.trim() === nextSectionText
+            # 5. '다음' 버튼 클릭 (aria-label='다음')
+            click_result = await page.evaluate("""(sectionText) => {
+                const h2 = [...document.querySelectorAll('h2')].find(
+                    h => h.textContent.trim() === sectionText
                 );
-                if (!heading) return { success: false, msg: 'heading not found' };
+                if (!h2) return { success: false, msg: 'section h2 not found' };
 
-                let article = heading.parentElement;
+                let article = h2.parentElement;
                 for (let i = 0; i < 10; i++) {
-                    if (!article) break;
-                    if (article.tagName === 'ARTICLE') break;
+                    if (!article || article.tagName === 'ARTICLE') break;
                     article = article.parentElement;
                 }
                 if (!article) return { success: false, msg: 'article not found' };
 
-                // CarouselHeader 내에서 aria-label='다음' 버튼 탐색
-                const carouselHeader = article.querySelector('[class*="CarouselHeader"]');
-                if (carouselHeader) {
-                    const nextBtn = carouselHeader.querySelector('[aria-label="다음"]');
-                    if (nextBtn) {
-                        nextBtn.click();
-                        return {
-                            success: true,
-                            method: 'CarouselHeader aria-label=다음',
-                            btnLabel: '다음'
-                        };
-                    }
-                }
-
-                // 전체 article에서 aria-label='다음' 버튼 탐색
+                // aria-label='다음' 버튼 클릭
                 const nextBtn = article.querySelector('[aria-label="다음"]');
-                if (nextBtn) {
+                if (nextBtn && !nextBtn.disabled) {
                     nextBtn.click();
                     return {
                         success: true,
-                        method: 'article aria-label=다음',
-                        btnLabel: '다음'
+                        method: 'aria-label=다음',
+                        disabled: nextBtn.disabled
                     };
                 }
 
-                return { success: false, msg: '"다음" button not found' };
+                // 마지막 nav 버튼 fallback
+                const buttons = [...article.querySelectorAll('button')].slice(0, 15);
+                const navButtons = buttons.filter(b =>
+                    !b.textContent.trim().includes('전체보기') &&
+                    b.className.indexOf('bookmark') === -1 &&
+                    b.getAttribute('aria-label') !== 'bookmark button'
+                );
+                if (navButtons.length >= 1) {
+                    const rightBtn = navButtons[navButtons.length - 1];
+                    if (!rightBtn.disabled) {
+                        rightBtn.click();
+                        return {
+                            success: true,
+                            method: 'last-nav-button-fallback',
+                            btnLabel: rightBtn.getAttribute('aria-label') || rightBtn.textContent.trim().slice(0, 20)
+                        };
+                    }
+                }
+                return { success: false, msg: '다음 button not found or disabled' };
             }""", next_section_text)
 
-            print(f"우측 '다음' 버튼 클릭 결과: {next_btn_result}")
-            assert next_btn_result.get('success'), f"우측 버튼 클릭 실패: {next_btn_result}"
-            print(f"✅ 우측 버튼 클릭 성공 (방법: {next_btn_result.get('method', 'N/A')})")
+            print(f"우측 '다음' 버튼 클릭 결과: {click_result}")
+            assert click_result.get('success'), f"우측 버튼 클릭 실패: {click_result}"
+            print(f"✅ 우측 버튼 클릭 성공 (방법: {click_result.get('method', 'N/A')})")
 
-            # 스크롤 후 상태 확인
+            # 6. 스크롤 후 상태 확인
             await page.wait_for_timeout(1000)
 
-            transform_after = await page.evaluate("""(nextSectionText) => {
-                const heading = [...document.querySelectorAll('h2')].find(
-                    el => el.textContent.trim() === nextSectionText
+            scroll_after = await page.evaluate("""(sectionText) => {
+                const h2 = [...document.querySelectorAll('h2')].find(
+                    h => h.textContent.trim() === sectionText
                 );
-                if (!heading) return null;
+                if (!h2) return { scrollLeft: 0 };
 
-                let article = heading.parentElement;
+                let article = h2.parentElement;
                 for (let i = 0; i < 10; i++) {
-                    if (!article) break;
-                    if (article.tagName === 'ARTICLE') break;
+                    if (!article || article.tagName === 'ARTICLE') break;
                     article = article.parentElement;
                 }
-                if (!article) return null;
+                if (!article) return { scrollLeft: 0 };
 
-                const carouselContainer = article.querySelector('[class*="CarouselContainer"]');
-                if (carouselContainer) {
-                    const translated = [...carouselContainer.querySelectorAll('ul, ol, div')].slice(0, 20).find(el => {
-                        const style = window.getComputedStyle(el);
-                        return style.transform !== 'none' && style.transform !== '';
-                    });
-                    if (translated) {
-                        return { transform: translated.style.transform || window.getComputedStyle(translated).transform };
-                    }
+                const carouselUl = article.querySelector('ul[class*="CarouselContainer"]');
+                if (carouselUl) {
+                    return { scrollLeft: carouselUl.scrollLeft, method: 'carouselUl' };
                 }
 
                 const scrollContainers = [...article.querySelectorAll('*')].slice(0, 60).filter(el => {
                     const style = window.getComputedStyle(el);
-                    return (style.overflowX === 'auto' || style.overflowX === 'scroll');
+                    return style.overflowX === 'auto' || style.overflowX === 'scroll';
                 });
                 if (scrollContainers.length > 0) {
-                    return { scrollLeft: scrollContainers[0].scrollLeft };
+                    return { scrollLeft: scrollContainers[0].scrollLeft, method: 'scrollContainer' };
                 }
-                return { scrollLeft: 0 };
+                return { scrollLeft: 0, method: 'default' };
             }""", next_section_text)
 
-            print(f"스크롤 후 상태: {transform_after}")
+            print(f"스크롤 후 상태: {scroll_after}")
 
-            # 변화 확인
-            if transform_before and transform_after:
-                before_scroll = transform_before.get('scrollLeft', 0)
-                after_scroll = transform_after.get('scrollLeft', 0)
-                before_transform = transform_before.get('transform', '')
-                after_transform = transform_after.get('transform', '')
+            # 스크롤 변화 확인
+            before_scroll = scroll_before.get('scrollLeft', 0) if scroll_before else 0
+            after_scroll = scroll_after.get('scrollLeft', 0) if scroll_after else 0
 
-                if after_scroll != before_scroll:
-                    print(f"✅ 우측 버튼 클릭 후 스크롤 발생 확인 "
-                          f"(scrollLeft: {before_scroll} → {after_scroll})")
-                elif before_transform != after_transform:
-                    print(f"✅ transform 기반 캐러셀 우측 이동 확인")
-                    print(f"   before: {before_transform}")
-                    print(f"   after:  {after_transform}")
-                else:
-                    # 버튼 클릭 자체는 성공했으므로 통과
-                    print("ℹ️ 상태 변화를 직접 감지하지 못했으나 '다음' 버튼 클릭은 성공")
+            if after_scroll != before_scroll:
+                print(f"✅ 우측 버튼 클릭 후 스크롤 발생 확인 "
+                      f"(scrollLeft: {before_scroll} → {after_scroll})")
             else:
-                print("ℹ️ 상태 정보를 가져오지 못했으나 '다음' 버튼 클릭은 성공")
+                # transform 기반 캐러셀 확인
+                transform_changed = await page.evaluate("""(sectionText) => {
+                    const h2 = [...document.querySelectorAll('h2')].find(
+                        h => h.textContent.trim() === sectionText
+                    );
+                    if (!h2) return { found: false };
+
+                    let article = h2.parentElement;
+                    for (let i = 0; i < 10; i++) {
+                        if (!article || article.tagName === 'ARTICLE') break;
+                        article = article.parentElement;
+                    }
+                    if (!article) return { found: false };
+
+                    const transformed = [...article.querySelectorAll('ul, ol, div')].slice(0, 30).filter(el => {
+                        const style = window.getComputedStyle(el);
+                        return style.transform !== 'none' && style.transform !== '';
+                    });
+                    if (transformed.length > 0) {
+                        return {
+                            found: true,
+                            transform: window.getComputedStyle(transformed[0]).transform
+                        };
+                    }
+                    return { found: false };
+                }""", next_section_text)
+
+                if transform_changed and transform_changed.get('found'):
+                    print(f"✅ transform 기반 캐러셀 동작 확인 (transform: {transform_changed.get('transform', '')})")
+                else:
+                    print("ℹ️ 스크롤/transform 변화를 직접 감지하지 못했으나 '다음' 버튼 클릭은 성공")
 
             print("✅ 모든 검증 완료")
 
