@@ -70,12 +70,12 @@ async def test_main():
 
             # 테스트 로직
 
-            await page.screenshot(path='screenshots/test_{NO}_success.png  # {NO}는 두 자리 숫자 (예: 01, 02, 10)')
+            await page.screenshot(path='screenshots/<테스트 파일명>_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)')
+            await page.screenshot(path='screenshots/<테스트 파일명>_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise  # pytest가 FAILED로 인식하도록 반드시 re-raise
 
@@ -113,10 +113,44 @@ await page.wait_for_timeout(500)
 await btn.click(force=True)
 ```
 
+### 방해 팝업 처리 규칙 (반드시 준수)
+
+검증 대상이 **아닌** 팝업·모달·배너가 화면을 가려 클릭이 막히는 경우가 있다.
+(예: 로그인 상태로 탐색 홈 진입 시 뜨는 '희망 근무지 설정' 팝업)
+
+- 이런 방해 요소를 **스크립트 안에서 직접 닫는 코드를 작성하지 말 것**
+- 반드시 공용 헬퍼 `ui_helpers.dismiss_optional_popups(page)` 를 호출할 것
+- 호출 위치: 페이지 진입 직후, 해당 TC 의 실제 검증을 시작하기 전
+
+```python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+
+await page.goto('URL', timeout=30000)
+await page.wait_for_load_state('domcontentloaded')
+await dismiss_optional_popups(page)   # 검증 대상이 아닌 팝업 정리
+# 여기부터 이 TC 의 실제 검증
+```
+
+**헬퍼에 아직 등록되지 않은 새 팝업을 만난 경우**
+1. `ui_helpers.py` 의 `POPUPS` 목록에 한 줄 추가한다
+   `{'name': '팝업 이름', 'has_text': '식별 텍스트', 'button': '닫기 버튼 이름'}`
+2. 스크립트에는 `dismiss_optional_popups(page)` 호출만 남긴다
+3. 스크립트 안에 개별 닫기 코드를 남기지 않는다
+
+**예외 — 팝업 자체가 검증 대상인 TC**
+확인사항/기대결과가 그 팝업의 노출이나 동작을 다루는 경우에는 헬퍼를 쓰지 않는다.
+그 TC 안에서 직접 노출을 확인하고 닫는다. (헬퍼가 먼저 닫으면 검증할 대상이 사라진다)
+
 ### 스크린샷 규칙 (반드시 준수)
 - **TC당 스크린샷은 1장만** 허용
-- 성공 시: `screenshots/test_{NO}_success.png  # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
-- 실패 시: `screenshots/test_{NO}_failed.png   # {NO}는 두 자리 숫자 (예: 01, 02, 10)` 1장만 저장
+- **파일명은 테스트 스크립트 파일명과 반드시 일치**시킨다. 순번(NO)을 쓰지 않는다.
+  - 테스트 파일이 `test/CAREERSHOME/test_CAREERSHOME_004_success.py` 라면
+  - 성공 시: `screenshots/test_CAREERSHOME_004_success.png`
+  - 실패 시: `screenshots/test_CAREERSHOME_004_failed.png`
+- 경로는 변수나 f-string 없이 문자열 리터럴로 그대로 적는다
 - 중간 단계(페이지 로드, 버튼 클릭 등) 스크린샷 절대 금지
 - `page.screenshot()`은 try 블록 마지막(성공 확정 후)과 except 블록(실패 확정 후) 각각 1회씩만 호출
 

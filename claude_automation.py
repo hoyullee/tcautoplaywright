@@ -1,13 +1,17 @@
 import json
 import subprocess
 import os
+import re
 import sys
 import shutil
+import hashlib
 import time
 import logging
 import argparse
 from pathlib import Path
 from dotenv import load_dotenv
+
+from ui_helpers import POPUPS
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -30,19 +34,27 @@ logging.basicConfig(
 AUTH_STATE_FILE = 'work/auth_state.json'
 
 
+def requires_logged_in(precondition):
+    """사전조건이 '로그인 상태'를 요구하는지.
+
+    '비로그인 상태'에도 '로그인 상태'가 부분 문자열로 들어 있으므로
+    앞 글자가 '비'인 경우는 제외한다.
+    """
+    return re.search(r'(?<!비)로그인 상태', precondition or '') is not None
+
 def is_login_precondition(test_case):
     """사전조건이 '로그인 상태'인지 확인 → 저장된 세션 사용"""
-    return '로그인 상태' in test_case.get('사전조건', '')
+    return requires_logged_in(test_case.get('사전조건', ''))
 
 def is_login_action_test(test_case):
     """실제 로그인을 수행하고 세션을 저장해야 하는 케이스인지 확인"""
     precondition = test_case.get('사전조건', '')
     expected = test_case.get('기대결과', '')
     checks = test_case.get('확인사항', '')
-    return (
-        '로그인 상태' not in precondition and
-        ('로그인' in expected or '로그인 버튼' in checks)
-    )
+    # 이미 로그인된 상태이거나, 비로그인 상태를 검증하는 케이스는 로그인을 수행하지 않는다
+    if requires_logged_in(precondition) or '비로그인' in precondition:
+        return False
+    return '로그인' in expected or '로그인 버튼' in checks
 
 def get_test_path_info(test_case):
     """TestCaseID로부터 (폴더명, 파일명 stem) 반환
@@ -56,6 +68,51 @@ def get_test_path_info(test_case):
     no = str(test_case.get('NO', 0)).zfill(3)
     return 'MISC', f'test_MISC_{no}'
 
+def is_popup_under_test(test_case):
+    """이 TC 자체가 등록된 팝업의 노출·동작을 검증하는 케이스인지.
+
+    이런 케이스에 공용 헬퍼를 쓰면 검증 대상이 먼저 닫혀 버리므로 제외해야 한다.
+    """
+    text = ' '.join(str(test_case.get(k, '')) for k in ('확인사항', '기대결과', '기능영역'))
+    return any(p['has_text'] in text for p in POPUPS)
+
+
+def build_popup_instruction(test_case):
+    """방해 팝업 처리에 대한 TC별 지시문. 등록된 팝업 목록을 함께 알려 준다."""
+    registered = '\n'.join(
+        f"  - {p['name']} (식별 텍스트 '{p['has_text']}', 닫기 버튼 '{p['button']}')"
+        for p in POPUPS) or '  - (등록된 팝업 없음)'
+
+    if is_popup_under_test(test_case):
+        return f"""
+## 방해 팝업 처리
+이 TC는 팝업 자체가 검증 대상으로 보입니다.
+`dismiss_optional_popups` 를 **사용하지 마세요**. 헬퍼가 먼저 닫으면 검증할 대상이 사라집니다.
+이 스크립트 안에서 직접 노출을 확인하고 닫으세요.
+"""
+
+    return f"""
+## 방해 팝업 처리 (반드시 준수)
+페이지 진입 직후, 실제 검증을 시작하기 전에 공용 헬퍼를 호출하세요.
+
+```python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+...
+await page.wait_for_load_state('domcontentloaded')
+await dismiss_optional_popups(page)   # 검증 대상이 아닌 팝업 정리
+```
+
+현재 헬퍼에 등록된 팝업:
+{registered}
+
+등록되지 않은 새 팝업이 검증을 가로막으면, 스크립트에 개별 닫기 코드를 넣지 말고
+`ui_helpers.py` 의 `POPUPS` 목록에 한 줄 추가한 뒤 위 헬퍼 호출만 남기세요.
+"""
+
+
 def create_claude_prompt(test_case):
     """Claude Code에 전달할 프롬프트 (TC 고유 정보만 포함, 정적 내용은 system_prompt.txt로 분리)"""
 
@@ -66,6 +123,7 @@ def create_claude_prompt(test_case):
 
     use_saved_session = is_login_precondition(test_case)
     save_session = is_login_action_test(test_case)
+    popup_instruction = build_popup_instruction(test_case)
 
     # 세션 관련 지시
     if use_saved_session:
@@ -135,6 +193,12 @@ assert '/cv/' in page.url and 'cv/list' not in page.url, f"이력서 편집 페�
 {f'- {login_info}' if login_info else ''}
 {f'- 세션: {session_instruction}' if session_instruction else ''}
 {resume_entry_snippet}
+{popup_instruction}
+## 스크린샷 경로 (반드시 아래 문자열 그대로 사용)
+- 성공 시: `await page.screenshot(path='screenshots/{stem}_success.png')`
+- 실패 시: `await page.screenshot(path='screenshots/{stem}_failed.png')`
+- 변수나 f-string 없이 위 문자열을 그대로 적을 것. 순번(NO) 기반 이름 금지.
+
 ## 작업
 1. `test/{folder}/{stem}_success.py` 파일에 코드 작성
 2. `python3 test/{folder}/{stem}_success.py` 실행
@@ -151,6 +215,117 @@ def load_system_prompt():
     with open('system_prompt.txt', 'r', encoding='utf-8') as f:
         return f.read()
 
+def _snapshot(path):
+    """파일 내용 스냅샷 (파일이 없으면 None)"""
+    try:
+        return Path(path).read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _digest(data):
+    return hashlib.sha256(data).hexdigest() if data is not None else None
+
+
+_CLI_ERROR_KEYWORDS = (
+    'does not have access',
+    'Please login',
+    'Invalid API key',
+    'Credit balance',
+    'usage limit',
+    'rate limit',
+    'Authentication',
+    'Unauthorized',
+    'not authenticated',
+)
+
+# claude CLI가 키체인 로그인보다 우선해서 사용하는 인증 환경 변수.
+# 셸에 만료된 값이 남아 있으면 정상 로그인 상태여도 CLI가 실패한다.
+_AUTH_ENV_VARS = (
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+)
+
+# 인증 실패로 볼 수 있는 메시지 패턴.
+# 실제로 관측된 문구를 그대로 반영한다.
+#   - Your organization does not have access to Claude. Please login again...
+#   - Failed to authenticate. API Error: 401 {"type":"authentication_error",
+#     "message":"OAuth access token has been revoked."}
+_AUTH_ERROR_RE = re.compile(
+    r'authentication_error'
+    r'|failed to authenticate'
+    r'|api error:\s*401'
+    r'|\b401\b[^\n]{0,80}(?:unauthorized|authentic)'
+    r'|(?:token|credential)s?[^\n]{0,40}revoked'
+    r'|does not have access'
+    r'|please login'
+    r'|invalid api key'
+    r'|\bunauthorized\b'
+    r'|not authenticated'
+    r'|인증 오류',
+    re.IGNORECASE,
+)
+
+AUTH_GUIDE = ('터미널에서 `claude /login` 으로 다시 로그인한 뒤 실행하세요. '
+              '`claude logout` 과 `claude setup-token` 은 기존 토큰을 무효화하므로 '
+              '자동화 실행 중에는 사용하지 마세요.')
+
+
+def _is_auth_error(message):
+    return bool(_AUTH_ERROR_RE.search(message or ''))
+
+
+def _stale_auth_vars():
+    """현재 환경에 설정돼 있는 인증 환경 변수 이름 목록"""
+    return [v for v in _AUTH_ENV_VARS if os.environ.get(v)]
+
+
+def _child_env(drop_auth_vars):
+    """자식 프로세스에 넘길 환경. drop_auth_vars=True 면 인증 변수를 제거한다."""
+    if not drop_auth_vars:
+        return None
+    env = os.environ.copy()
+    for v in _AUTH_ENV_VARS:
+        env.pop(v, None)
+    return env
+
+
+def _meaningful_lines(text):
+    """구분선·빈 줄을 제외한 의미 있는 출력 줄만 추린다."""
+    return [s for s in ((raw.strip()) for raw in (text or '').splitlines())
+            if s and not set(s) <= set('=-─· ')]
+
+
+def _cli_error_line(stdout, stderr):
+    """claude CLI가 남긴 오류 메시지 한 줄 추출"""
+    out_lines = _meaningful_lines(stdout)
+    err_lines = _meaningful_lines(stderr)
+    for line in out_lines + err_lines:
+        if any(k in line for k in _CLI_ERROR_KEYWORDS):
+            return line[:200]
+    tail = err_lines or out_lines
+    return tail[-1][:200] if tail else '출력 없음'
+
+
+def _preserve_or_restore(success_file, failed_file, original, changed, tc_id):
+    """마지막 시도까지 실패했을 때 스크립트 정리.
+
+    - 이번 실행에서 새로 만들어진 스크립트 → _failed.py 로 보존
+    - 기존 스크립트를 덮어쓴 경우      → 실패본을 _failed.py 로 남기고 원본 복원
+    - 파일이 전혀 바뀌지 않은 경우      → 손대지 않음 (멀쩡한 스크립트 삭제 방지)
+    """
+    if not changed:
+        logging.info(f"ℹ️  [{tc_id}] 스크립트가 변경되지 않아 기존 파일을 그대로 둡니다")
+        return
+    if success_file.exists():
+        shutil.move(str(success_file), str(failed_file))
+        logging.info(f"📄 [{tc_id}] 실패 코드 보존: {failed_file}")
+    if original is not None:
+        success_file.write_bytes(original)
+        logging.info(f"↩️  [{tc_id}] 이전 스크립트 복원: {success_file}")
+
+
 def _cleanup_temp_files(test_dir, stem):
     """_success.py / _failed.py 외 동일 stem의 임시 파일 삭제 (예: _debug.py, _debug2.py)"""
     keep = {f'{stem}_success.py', f'{stem}_failed.py'}
@@ -160,7 +335,13 @@ def _cleanup_temp_files(test_dir, stem):
             logging.info(f"🗑️  임시 파일 삭제: {f.name}")
 
 def run_claude_code(prompt, test_case, max_attempts=3):
-    """Claude Code 실행"""
+    """Claude Code 실행. (성공여부, 출력, 오류메시지) 반환
+
+    성공 판정 기준
+      1) claude CLI 종료 코드가 0이고
+      2) 출력에 AUTOMATION_SUCCESS 가 있거나, 이번 실행에서 스크립트가 실제로 바뀐 경우
+    이전 실행에서 만들어진 스크립트/스크린샷이 남아 있다는 이유만으로는 성공으로 보지 않는다.
+    """
 
     system_prompt = load_system_prompt()
     tc_id = test_case.get('TestCaseID', '') or f"NO{test_case.get('NO', '?')}"
@@ -168,36 +349,57 @@ def run_claude_code(prompt, test_case, max_attempts=3):
     test_dir = Path('test') / folder
     test_dir.mkdir(parents=True, exist_ok=True)
 
+    success_file = test_dir / f'{stem}_success.py'
+    failed_file = test_dir / f'{stem}_failed.py'
+
+    # 실행 전 원본 보존 — 변경 여부 판단과 실패 시 원복에 사용
+    original = _snapshot(success_file)
+    original_digest = _digest(original)
+
+    def invoke(env=None):
+        return subprocess.run(
+            [
+                'claude',
+                '--print',
+                '--model', 'sonnet',
+                '--dangerously-skip-permissions',
+                '--system-prompt', system_prompt,
+            ],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            cwd=os.getcwd(),
+            encoding='utf-8',
+            errors='replace',
+            shell=sys.platform == 'win32',
+            env=env,
+        )
+
+    dropped_auth_env = False
+
     for attempt in range(1, max_attempts + 1):
         logging.info(f"🤖 [{tc_id}] 실행 시도 {attempt}/{max_attempts}")
 
         try:
-            result = subprocess.run(
-                [
-                    'claude',
-                    '--print',
-                    '--model', 'sonnet',
-                    '--dangerously-skip-permissions',
-                    '--system-prompt', system_prompt,
-                ],
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=600,
-                cwd=os.getcwd(),
-                encoding='utf-8',
-                errors='replace',
-                shell=sys.platform == 'win32'
-            )
+            result = invoke(_child_env(dropped_auth_env))
+            output = result.stdout or ''
 
-            output = result.stdout
-
-            if result.returncode != 0:
-                logging.warning(f"⚠️ 종료 코드: {result.returncode}")
-
-            success_file = test_dir / f'{stem}_success.py'
-            failed_file  = test_dir / f'{stem}_failed.py'
-            screenshot   = Path('screenshots') / f'{stem}_success.png'
+            # 셸에 남아 있는 만료된 인증 토큰이 키체인 로그인을 가리는 경우가 있다.
+            # 인증 오류면 해당 환경 변수를 빼고 같은 시도 안에서 한 번 더 호출한다.
+            if result.returncode != 0 and not dropped_auth_env:
+                stale = _stale_auth_vars()
+                if stale and _is_auth_error(_cli_error_line(output, result.stderr)):
+                    logging.warning(
+                        f"⚠️ [{tc_id}] 인증 오류 — 셸에 남아 있는 "
+                        f"{', '.join(stale)} 를 제외하고 다시 호출합니다")
+                    dropped_auth_env = True
+                    result = invoke(_child_env(True))
+                    output = result.stdout or ''
+                    if result.returncode == 0:
+                        logging.info(
+                            f"✅ [{tc_id}] 환경 변수 제외 후 정상 호출됨 "
+                            f"(셸 설정에서 {', '.join(stale)} 를 정리하세요)")
 
             # Claude가 잘못된 경로에 파일을 생성한 경우 올바른 위치로 이동
             for misplaced in Path('test').rglob(f'{stem}_success.py'):
@@ -206,36 +408,52 @@ def run_claude_code(prompt, test_case, max_attempts=3):
                     logging.info(f"📦 파일 위치 정정: {misplaced} → {success_file}")
                     break
 
-            if 'AUTOMATION_SUCCESS' in output or success_file.exists() or screenshot.exists():
-                # 이전 실패 파일 및 중간 디버그 파일 정리
+            changed = _digest(_snapshot(success_file)) != original_digest
+
+            # 1) CLI 자체가 실패한 경우 (인증 오류, 사용량 초과 등) → 무조건 실패
+            if result.returncode != 0:
+                detail = _cli_error_line(output, result.stderr)
+                logging.error(
+                    f"❌ [{tc_id}] claude CLI 실패 (종료 코드 {result.returncode}) — {detail}")
+
+                # 인증 문제는 재시도해도 결과가 같다. 시간만 쓰므로 즉시 중단한다.
+                if _is_auth_error(detail):
+                    logging.error(f"🔑 [{tc_id}] 인증 문제로 판단되어 재시도 없이 중단합니다.")
+                    logging.error(f"🔑 {AUTH_GUIDE}")
+                    _preserve_or_restore(success_file, failed_file, original, changed, tc_id)
+                    return False, output, f"인증 오류 — {detail}"
+
+                if attempt < max_attempts:
+                    logging.info("🔄 재시도...")
+                    time.sleep(5)
+                    continue
+                _preserve_or_restore(success_file, failed_file, original, changed, tc_id)
+                return False, output, f"claude CLI 실패(종료 코드 {result.returncode}) — {detail}"
+
+            # 2) 성공 마커가 있거나, 실패 마커 없이 스크립트가 실제로 갱신된 경우만 성공
+            if 'AUTOMATION_SUCCESS' in output or (changed and 'AUTOMATION_FAILED:' not in output):
                 if failed_file.exists():
                     failed_file.unlink()
                 _cleanup_temp_files(test_dir, stem)
                 logging.info(f"✅ [{tc_id}] 성공!")
                 return True, output, None
 
-            elif 'AUTOMATION_FAILED:' in output:
+            if 'AUTOMATION_FAILED:' in output:
                 error_msg = output.split('AUTOMATION_FAILED:')[1].split('\n')[0].strip()
                 logging.warning(f"❌ [{tc_id}] 실패: {error_msg}")
                 if attempt < max_attempts:
                     logging.info("🔄 재시도...")
                     time.sleep(5)
-                else:
-                    # 마지막 시도 실패 → success.py를 failed.py로 보존
-                    if success_file.exists():
-                        shutil.move(str(success_file), str(failed_file))
-                        logging.info(f"📄 실패 코드 보존: {failed_file}")
-                    return False, output, error_msg
+                    continue
+                _preserve_or_restore(success_file, failed_file, original, changed, tc_id)
+                return False, output, error_msg
 
-            else:
-                logging.warning(f"⚠️ 결과 불명확")
-                if attempt < max_attempts:
-                    time.sleep(5)
-                else:
-                    if success_file.exists():
-                        shutil.move(str(success_file), str(failed_file))
-                        logging.info(f"📄 실패 코드 보존: {failed_file}")
-                    return False, output, "결과 불명확"
+            logging.warning(f"⚠️ [{tc_id}] 결과 불명확 — 성공/실패 마커가 없고 스크립트 변경도 없음")
+            if attempt < max_attempts:
+                time.sleep(5)
+                continue
+            _preserve_or_restore(success_file, failed_file, original, changed, tc_id)
+            return False, output, "결과 불명확"
 
         except subprocess.TimeoutExpired:
             logging.warning(f"⏱️ [{tc_id}] 타임아웃")
@@ -263,7 +481,7 @@ def main():
     # test_cases.json 확인
     if not os.path.exists('test_cases.json'):
         logging.error("❌ test_cases.json 파일이 없습니다!")
-        return
+        sys.exit(1)
 
     # 테스트 케이스 로드
     with open('test_cases.json', 'r', encoding='utf-8') as f:
@@ -274,7 +492,7 @@ def main():
         test_cases = [tc for tc in all_test_cases if tc.get('TestCaseID') == args.tc]
         if not test_cases:
             logging.error(f"❌ TestCaseID '{args.tc}'를 찾을 수 없습니다!")
-            return
+            sys.exit(1)
         logging.info(f"🎯 {args.tc} 단일 테스트 실행")
     else:
         test_cases = all_test_cases
@@ -308,7 +526,7 @@ def main():
             'error': error,
         })
 
-        print(f"{'✅ 성공!' if success else '❌ 실패!'}")
+        print(f"✅ 성공!" if success else f"❌ 실패! — {error or '원인 미확인'}")
 
         # LOGIN-005(로그아웃) 완료 후 LOGIN-003(로그인)으로 세션 복원
         if tc_id == 'LOGIN-005' and login_tc is not None:
@@ -336,6 +554,13 @@ def main():
     print(f"✅ 성공: {success_count}개")
     print(f"⏭️  스킵: {skipped_count}개")
     print(f"❌ 실패: {failed_count}개")
+
+    for r in results:
+        if r['status'] == 'FAILED':
+            print(f"   ❌ {r['tc_id']} — {r['error'] or '원인 미확인'}")
+
+    # 호출한 쪽(run_all_tests.py)이 종료 코드로 성패를 판단할 수 있게 한다
+    sys.exit(1 if failed_count else 0)
 
 if __name__ == '__main__':
     main()
