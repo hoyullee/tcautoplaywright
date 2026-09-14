@@ -47,13 +47,13 @@ async def test_main():
             assert 'social.wanted.co.kr' in current_url, \
                 f"소셜 페이지 URL이 아닙니다. 현재 URL: {current_url}"
 
-            await screenshot_page.screenshot(path='screenshots/test_33_success.png')
+            await screenshot_page.screenshot(path='screenshots/test_GNB_008_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
             try:
-                await page.screenshot(path='screenshots/test_33_failed.png')
+                await page.screenshot(path='screenshots/test_GNB_008_failed.png')
             except Exception:
                 pass
             print(f"AUTOMATION_FAILED: {e}")

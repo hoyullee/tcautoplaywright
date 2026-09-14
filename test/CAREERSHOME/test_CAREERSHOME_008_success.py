@@ -281,12 +281,12 @@ async def test_main():
 
             print("✅ 모든 검증 완료")
 
-            await page.screenshot(path='screenshots/test_16_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_008_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_16_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_008_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

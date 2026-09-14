@@ -54,13 +54,13 @@ async def test_main():
             assert 'gigs/experts' in current_url, \
                 f"프리랜서 페이지 URL이 아닙니다. 현재 URL: {current_url}"
 
-            await screenshot_page.screenshot(path='screenshots/test_34_success.png')
+            await screenshot_page.screenshot(path='screenshots/test_GNB_009_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
             try:
-                await page.screenshot(path='screenshots/test_34_failed.png')
+                await page.screenshot(path='screenshots/test_GNB_009_failed.png')
             except Exception:
                 pass
             print(f"AUTOMATION_FAILED: {e}")

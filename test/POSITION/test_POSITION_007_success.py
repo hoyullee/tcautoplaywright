@@ -169,12 +169,12 @@ async def test_main():
             assert position_list_found, "추천 포지션 하단의 포지션 리스트가 노출되지 않았습니다"
             print("✓ 포지션 리스트 노출 확인 완료")
 
-            await page.screenshot(path='screenshots/test_49_success.png')
+            await page.screenshot(path='screenshots/test_POSITION_007_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_49_failed.png')
+            await page.screenshot(path='screenshots/test_POSITION_007_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

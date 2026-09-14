@@ -203,12 +203,12 @@ async def test_main():
 
             print("✅ 우측 버튼 클릭 후 추가 포지션 카드 노출 확인")
 
-            await page.screenshot(path=f'screenshots/test_{TEST_NO}_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_004_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path=f'screenshots/test_{TEST_NO}_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_004_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -50,12 +50,12 @@ async def test_main():
             assert '/cv/' in final_url and '/list' not in final_url, \
                 f"이력서 작성 페이지로 이동하지 않았습니다. 현재 URL: {final_url}"
 
-            await page.screenshot(path='screenshots/test_62_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_62_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

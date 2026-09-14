@@ -349,12 +349,12 @@ async def test_main():
                 f"우측 버튼 클릭 후에도 카드가 충분히 노출되지 않음: {after_card_count}개"
             print(f"✅ 우측 버튼 클릭 후 카드 노출 확인: {after_card_count}개")
 
-            await page.screenshot(path=f'screenshots/test_{TEST_NO}_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_002_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path=f'screenshots/test_{TEST_NO}_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_002_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

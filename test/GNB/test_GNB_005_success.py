@@ -31,12 +31,12 @@ async def test_main():
             current_url = page.url
             assert 'cv/list' in current_url, f"Expected /cv/list but got: {current_url}"
 
-            await page.screenshot(path='screenshots/test_30_success.png')
+            await page.screenshot(path='screenshots/test_GNB_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_30_failed.png')
+            await page.screenshot(path='screenshots/test_GNB_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

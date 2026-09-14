@@ -143,12 +143,12 @@ async def test_main():
             else:
                 print("[OK] 우측 버튼 클릭 완료 (transform 기반 슬라이더 가능)")
 
-            await page.screenshot(path='screenshots/test_06_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_06_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

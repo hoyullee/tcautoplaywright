@@ -1,4 +1,8 @@
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+import sys
 from playwright.async_api import async_playwright
 import asyncio
 import os
@@ -22,6 +26,7 @@ async def test_main():
             # 탐색 페이지에서 포지션 URL 수집 후 방문 (최근 본 포지션 데이터 확보)
             await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)  # 검증 대상이 아닌 팝업 정리
             await page.wait_for_timeout(2000)
 
             position_links = await page.evaluate("""() => {
@@ -361,12 +366,12 @@ async def test_main():
             assert after_visible >= 1, f"우측 버튼 클릭 후 포지션 카드가 보이지 않음"
             print(f"✅ 우측 버튼 클릭 후 추가 포지션 카드 {after_visible}개 노출 확인")
 
-            await page.screenshot(path='screenshots/test_20_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_016_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_20_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_016_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

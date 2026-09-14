@@ -214,12 +214,12 @@ async def test_main():
             assert deleted_count > 0, "삭제된 이력서가 없습니다"
             print(f"총 {deleted_count}개의 '작성 중' 이력서 삭제 완료")
 
-            await page.screenshot(path='screenshots/test_72_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_011_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_72_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_011_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

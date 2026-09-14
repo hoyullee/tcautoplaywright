@@ -123,12 +123,12 @@ async def test_main():
 
             print(f"✅ 인기 검색어 '{popular_term_text}'로 검색 결과 페이지 랜딩 확인: {final_url}")
 
-            await page.screenshot(path='screenshots/test_60_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_008_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_60_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_008_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

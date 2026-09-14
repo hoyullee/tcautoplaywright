@@ -218,12 +218,12 @@ async def test_main():
             await context.storage_state(path='work/auth_state.json')
             print("세션 저장 완료: work/auth_state.json")
 
-            await page.screenshot(path='screenshots/test_36_success.png')
+            await page.screenshot(path='screenshots/test_LOGIN_006_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_36_failed.png')
+            await page.screenshot(path='screenshots/test_LOGIN_006_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

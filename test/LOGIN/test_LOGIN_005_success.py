@@ -118,12 +118,12 @@ async def test_main():
                 f"채용 홈 리다이렉트 실패. 현재 URL: {final_url}"
             print(f"로그아웃 성공 - 채용 홈으로 리다이렉트 확인: {final_url}")
 
-            await page.screenshot(path='screenshots/test_05_success.png')
+            await page.screenshot(path='screenshots/test_LOGIN_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_05_failed.png')
+            await page.screenshot(path='screenshots/test_LOGIN_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

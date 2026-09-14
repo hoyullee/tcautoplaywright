@@ -69,12 +69,12 @@ async def test_main():
             current_url = page.url
             assert 'jobshistory' in current_url, f"Expected jobshistory URL, got: {current_url}"
 
-            await page.screenshot(path='screenshots/test_21_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_017_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_21_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_017_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

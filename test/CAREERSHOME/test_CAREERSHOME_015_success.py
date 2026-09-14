@@ -268,12 +268,12 @@ async def test_main():
             assert after_card_count >= 1, f"스크롤 후 카드가 보이지 않음"
             print(f"✅ 스크롤 후 추가 컨텐츠 카드 {after_card_count}개 노출 확인")
 
-            await page.screenshot(path='screenshots/test_19_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_015_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_19_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_015_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

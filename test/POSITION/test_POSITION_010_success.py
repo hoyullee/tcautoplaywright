@@ -1,4 +1,8 @@
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+import sys
 from playwright.async_api import async_playwright
 import asyncio
 import os
@@ -24,6 +28,7 @@ async def test_main():
             # 탐색 페이지에서 포지션 카드 링크 추출
             await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)  # 검증 대상이 아닌 팝업 정리
             await page.wait_for_timeout(2000)
 
             # 첫 번째 포지션 카드 링크 찾기
@@ -145,12 +150,12 @@ async def test_main():
                 f"'제출하기' 버튼이 비활성화 상태입니다 (disabled={disabled_attr})"
             print("✓ 제출하기 버튼 활성화 확인")
 
-            await page.screenshot(path='screenshots/test_52_success.png')
+            await page.screenshot(path='screenshots/test_POSITION_010_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_52_failed.png')
+            await page.screenshot(path='screenshots/test_POSITION_010_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

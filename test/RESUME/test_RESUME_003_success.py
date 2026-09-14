@@ -122,12 +122,12 @@ async def test_main():
             print("  ✓ 검색 텍스트 박스")
             print("  ✓ 포지션 리스트")
 
-            await page.screenshot(path='screenshots/test_64_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_003_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_64_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_003_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

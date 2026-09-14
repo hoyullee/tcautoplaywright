@@ -353,6 +353,11 @@ async def test_main():
             if not emp_filled:
                 print("⚠️ 재직형태 선택 실패 - 계속 진행합니다.")
 
+            # 재직형태 select 트리거가 포커스를 붙잡고 있으면 이후 입력 필드로 포커스가
+            # 넘어가지 않으므로, 빈 곳을 클릭해 포커스를 명시적으로 해제한다.
+            await page.mouse.click(10, 10)
+            await page.wait_for_timeout(500)
+
             # ===== 주요 성과 입력 =====
             achievement_input = page.locator('input[placeholder*="주요 성과"]').first
             visible_ach = await achievement_input.count() > 0 and await achievement_input.is_visible()
@@ -407,9 +412,16 @@ async def test_main():
                 current_detail = await achievement_detail.input_value()
                 if not current_detail:
                     await achievement_detail.scroll_into_view_if_needed()
-                    await achievement_detail.click()
+                    detail_text = "마이크로서비스 아키텍처 기반 API 설계 및 성능 최적화로 응답 속도 30% 개선"
+                    # 이 textarea는 auto-resize 컴포넌트라 fill()로는 React 상태가 갱신되지 않아
+                    # 실제 키보드 입력(keyboard.type)으로 값을 채운다.
+                    try:
+                        await achievement_detail.click(timeout=5000)
+                    except Exception:
+                        print("일반 클릭 실패 - force 클릭으로 재시도")
+                        await achievement_detail.click(force=True, timeout=5000)
                     await page.wait_for_timeout(300)
-                    await achievement_detail.fill("마이크로서비스 아키텍처 기반 API 설계 및 성능 최적화로 응답 속도 30% 개선")
+                    await page.keyboard.type(detail_text, delay=20)
                     await page.wait_for_timeout(500)
                     print("주요 성과 상세 입력 완료")
                 else:
@@ -450,12 +462,12 @@ async def test_main():
 
             print("✅ 경력 항목 모두 입력 확인 완료")
 
-            await page.screenshot(path='screenshots/test_67_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_006_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_67_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_006_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

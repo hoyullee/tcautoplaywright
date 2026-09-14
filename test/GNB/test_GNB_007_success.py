@@ -31,12 +31,12 @@ async def test_main():
             assert 'wanted.co.kr/events' in current_url, \
                 f"콘텐츠 페이지 URL이 아닙니다. 현재 URL: {current_url}"
 
-            await page.screenshot(path='screenshots/test_32_success.png')
+            await page.screenshot(path='screenshots/test_GNB_007_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_32_failed.png')
+            await page.screenshot(path='screenshots/test_GNB_007_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -89,12 +89,12 @@ async def test_main():
             assert '/tags/' in current_url, f"기대한 태그 페이지로 이동되지 않음. 현재 URL: {current_url}"
             print("✓ '전체보기' 버튼 클릭 시 태그 페이지로 이동 확인")
 
-            await page.screenshot(path='screenshots/test_20_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_020_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_20_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_020_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

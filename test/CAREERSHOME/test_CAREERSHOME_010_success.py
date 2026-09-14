@@ -118,12 +118,12 @@ async def test_main():
             page_title = await page.title()
             print(f"Page title: {page_title}")
 
-            await page.screenshot(path='screenshots/test_07_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_010_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_07_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_010_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -79,12 +79,12 @@ async def test_main():
             assert len(set(ranks_found)) >= 8, f"1~8위 순위 항목이 모두 노출되지 않음. 확인된 순위: {sorted(set(ranks_found))}"
             print("✅ 인기 검색어 1위~8위 버튼(링크) 노출 확인")
 
-            await page.screenshot(path='screenshots/test_53_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_53_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

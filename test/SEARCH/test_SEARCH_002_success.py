@@ -134,12 +134,12 @@ async def test_main():
             assert section_check['profile'], "프로필 섹션 리스트가 노출되지 않음"
             print("✅ 프로필 리스트 노출 확인")
 
-            await page.screenshot(path='screenshots/test_54_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_002_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_54_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_002_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

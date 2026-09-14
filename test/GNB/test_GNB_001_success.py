@@ -118,12 +118,12 @@ async def test_main():
             print("✅ GNB 모든 메뉴 항목 확인 완료")
             print("  - wanted 로고, 채용, 이력서, 교육•이벤트, 콘텐츠, 소셜, 프리랜서, 더보기, 검색, 회원가입/로그인, 기업 서비스")
 
-            await page.screenshot(path='screenshots/test_26_success.png')
+            await page.screenshot(path='screenshots/test_GNB_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_26_failed.png')
+            await page.screenshot(path='screenshots/test_GNB_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

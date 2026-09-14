@@ -1,4 +1,8 @@
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+import sys
 from playwright.async_api import async_playwright
 import asyncio
 import os
@@ -24,6 +28,7 @@ async def test_main():
             # 탐색 페이지로 이동하여 포지션 카드 선택
             await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)  # 검증 대상이 아닌 팝업 정리
 
             # 첫 번째 포지션 카드 링크 찾기
             position_card = page.locator('a[href^="/wd/"]').first
@@ -217,12 +222,12 @@ async def test_main():
 
             print(f"AUTOMATION_SUCCESS: 포지션 상세 하단 태그 노출 확인 완료. 태그: {tag_texts[:5]}")
 
-            await page.screenshot(path='screenshots/test_45_success.png')
+            await page.screenshot(path='screenshots/test_POSITION_003_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_45_failed.png')
+            await page.screenshot(path='screenshots/test_POSITION_003_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

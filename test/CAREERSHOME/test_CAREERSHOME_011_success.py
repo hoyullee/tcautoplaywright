@@ -94,12 +94,12 @@ async def test_main():
                 raise Exception(f"'포지션맵' 페이지로 이동되지 않았습니다. URL: {current_url}")
             print("[OK] '포지션맵' 페이지로 이동 확인")
 
-            await target_page.screenshot(path='screenshots/test_12_success.png')
+            await target_page.screenshot(path='screenshots/test_CAREERSHOME_011_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_12_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_011_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

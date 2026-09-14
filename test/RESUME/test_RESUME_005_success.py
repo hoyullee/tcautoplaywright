@@ -211,12 +211,12 @@ async def test_main():
             print(f"   - 작성 텍스트: '{current_value}'")
             print(f"   - 텍스트 길이: {len(current_value)}자")
 
-            await page.screenshot(path='screenshots/test_66_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_66_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

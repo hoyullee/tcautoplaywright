@@ -132,12 +132,12 @@ async def test_main():
 
             assert profile_page_entered, f"프로필 페이지 진입 실패. 현재 URL: {current_url}"
 
-            await page.screenshot(path='screenshots/test_04_success.png')
+            await page.screenshot(path='screenshots/test_LOGIN_004_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_04_failed.png')
+            await page.screenshot(path='screenshots/test_LOGIN_004_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

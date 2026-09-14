@@ -87,12 +87,12 @@ async def test_main():
             print(f"✅ LNB '이력서 리뷰' 항목 확인: {res_count}개 발견")
             print(f"✅ 현재 URL: {page.url}")
 
-            await page.screenshot(path='screenshots/test_63_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_002_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_63_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_002_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -90,12 +90,12 @@ async def test_main():
             assert is_login_page, f"로그인/회원가입 페이지로 이동하지 않았습니다. 현재 URL: {current_url}"
             print(f"✓ 로그인/회원가입 페이지 진입 확인 완료. URL: {current_url}")
 
-            await page.screenshot(path='screenshots/test_50_success.png')
+            await page.screenshot(path='screenshots/test_POSITION_008_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_50_failed.png')
+            await page.screenshot(path='screenshots/test_POSITION_008_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

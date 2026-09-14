@@ -323,12 +323,12 @@ async def test_main():
             assert naver_map_found, "네이버 지도가 근무지역 섹션에 노출되지 않았습니다"
             print("✓ 네이버 지도 노출 확인 완료")
 
-            await page.screenshot(path='screenshots/test_47_success.png')
+            await page.screenshot(path='screenshots/test_POSITION_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_47_failed.png')
+            await page.screenshot(path='screenshots/test_POSITION_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

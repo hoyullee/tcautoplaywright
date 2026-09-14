@@ -94,12 +94,12 @@ async def test_main():
 
             print(f"4. 우측 버튼 클릭 후 카드가 우측으로 이동하며 추가 컨텐츠 카드 노출 확인 완료 (x 이동량: {x_diff}px)")
 
-            await page.screenshot(path='screenshots/test_18_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_014_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_18_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_014_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -47,12 +47,12 @@ async def test_main():
                 'auth' in current_url
             ), f"회원가입/로그인 페이지 진입 실패. 현재 URL: {current_url}"
 
-            await page.screenshot(path='screenshots/test_35_success.png')
+            await page.screenshot(path='screenshots/test_EVENT_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_35_failed.png')
+            await page.screenshot(path='screenshots/test_EVENT_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -108,12 +108,12 @@ async def test_main():
             assert 'cv/list' in page.url or 'cv/intro' in page.url, \
                 f"이력서 탭 페이지로 이동하지 않음: {page.url}"
 
-            await page.screenshot(path='screenshots/test_71_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_010_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_71_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_010_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

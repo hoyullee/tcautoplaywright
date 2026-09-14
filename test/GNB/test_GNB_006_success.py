@@ -40,12 +40,12 @@ async def test_main():
             current_url = target_page.url
             assert 'event.wanted.co.kr' in current_url, f"Expected event.wanted.co.kr but got: {current_url}"
 
-            await target_page.screenshot(path='screenshots/test_31_success.png')
+            await target_page.screenshot(path='screenshots/test_GNB_006_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_31_failed.png')
+            await page.screenshot(path='screenshots/test_GNB_006_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

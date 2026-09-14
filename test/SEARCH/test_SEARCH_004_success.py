@@ -134,12 +134,12 @@ async def test_main():
             assert re.search(r'/company/\d+', final_url), f"회사 상세 페이지로 이동되지 않음. URL: {final_url}"
             print(f"✅ 회사 상세 페이지 이동 확인: {final_url}")
 
-            await page.screenshot(path='screenshots/test_56_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_004_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_56_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_004_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

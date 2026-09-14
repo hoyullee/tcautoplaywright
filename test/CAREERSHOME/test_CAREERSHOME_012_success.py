@@ -65,12 +65,12 @@ async def test_main():
             current_url = page.url
             assert 'matched' in current_url, f"Expected URL to contain 'matched', but got: {current_url}"
 
-            await page.screenshot(path='screenshots/test_15_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_012_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_15_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_012_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

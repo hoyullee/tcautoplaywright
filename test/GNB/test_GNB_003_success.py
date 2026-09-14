@@ -33,12 +33,12 @@ async def test_main():
             current_url = page.url
             assert 'wdlist' in current_url, f"탐색 페이지 진입 실패. 현재 URL: {current_url}"
 
-            await page.screenshot(path='screenshots/test_28_success.png')
+            await page.screenshot(path='screenshots/test_GNB_003_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_28_failed.png')
+            await page.screenshot(path='screenshots/test_GNB_003_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

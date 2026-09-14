@@ -119,12 +119,12 @@ async def test_main():
 
             print(f"Successfully navigated to '한 번쯤 가보고 싶은 회사' page: {new_url}")
 
-            await page.screenshot(path='screenshots/test_17_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_013_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_17_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_013_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

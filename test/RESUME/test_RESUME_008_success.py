@@ -260,12 +260,12 @@ async def test_main():
 
             assert skill_registered, "스킬에 'Playwright'가 등록되지 않았습니다"
 
-            await page.screenshot(path='screenshots/test_69_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_008_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_69_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_008_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

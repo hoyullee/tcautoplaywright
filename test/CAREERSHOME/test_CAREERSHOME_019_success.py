@@ -86,12 +86,12 @@ async def test_main():
             assert 'position-map' in current_url, f"포지션맵 페이지로 이동되지 않음. 현재 URL: {current_url}"
             print("✓ '지도로 공고 찾기' 버튼 클릭 시 포지션맵 페이지로 이동 확인")
 
-            await target_page.screenshot(path='screenshots/test_23_success.png')
+            await target_page.screenshot(path='screenshots/test_CAREERSHOME_019_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_23_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_019_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

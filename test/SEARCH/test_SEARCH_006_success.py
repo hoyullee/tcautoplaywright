@@ -187,12 +187,12 @@ async def test_main():
             )
             print(f"✅ 소셜 상세 페이지 이동 확인: {final_url}")
 
-            await active_page.screenshot(path='screenshots/test_58_success.png')
+            await active_page.screenshot(path='screenshots/test_SEARCH_006_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_58_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_006_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

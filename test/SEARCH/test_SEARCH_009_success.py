@@ -94,12 +94,12 @@ async def test_main():
             assert item_count > 0, "최근 검색어 '개발자' 항목이 표시되지 않음"
             print(f"✅ 최근 검색어 항목 '개발자' 노출 확인")
 
-            await page.screenshot(path='screenshots/test_61_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_009_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_61_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_009_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

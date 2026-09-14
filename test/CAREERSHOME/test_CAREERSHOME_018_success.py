@@ -243,12 +243,12 @@ async def test_main():
                     f"우측 버튼 클릭 후 역방향 스크롤: {scroll_before} → {scroll_after}"
                 print(f"✓ 우측 버튼 클릭 시 캐러셀 스크롤 확인 (scrollLeft: {scroll_before} → {scroll_after})")
 
-            await page.screenshot(path='screenshots/test_22_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_018_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_22_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_018_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

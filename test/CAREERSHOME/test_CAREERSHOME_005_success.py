@@ -143,12 +143,12 @@ async def test_main():
 
             print(f"테스트 성공: '{initial_station}' → '{new_station_text}' 역 변경 및 포지션 카드 업데이트 확인")
 
-            await page.screenshot(path='screenshots/test_11_success.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_11_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERSHOME_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

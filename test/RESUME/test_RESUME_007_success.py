@@ -645,12 +645,12 @@ async def test_main():
 
             print("✅ 학력 항목 모두 입력 확인 완료")
 
-            await page.screenshot(path='screenshots/test_68_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_007_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_68_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_007_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

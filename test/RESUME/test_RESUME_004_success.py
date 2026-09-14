@@ -100,12 +100,12 @@ async def test_main():
             assert await review_receive_btn.count() > 0, "'이력서 리뷰 받기' 버튼이 노출되지 않습니다"
             print("'이력서 리뷰 받기' 버튼 확인")
 
-            await page.screenshot(path='screenshots/test_65_success.png')
+            await page.screenshot(path='screenshots/test_RESUME_004_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_65_failed.png')
+            await page.screenshot(path='screenshots/test_RESUME_004_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

@@ -28,12 +28,12 @@ async def test_main():
 
             assert count == 0, f"'적극 채용 중인 회사' 항목이 노출됨 (비로그인 상태에서는 비노출이어야 함). count={count}"
 
-            await page.screenshot(path='screenshots/test_39_success.png')
+            await page.screenshot(path='screenshots/test_CAREERS_001_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_39_failed.png')
+            await page.screenshot(path='screenshots/test_CAREERS_001_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 

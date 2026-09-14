@@ -154,12 +154,12 @@ async def test_main():
             assert re.search(r'/events/\d+', final_url), f"콘텐츠 상세 페이지로 이동되지 않음. URL: {final_url}"
             print(f"✅ 콘텐츠 상세 페이지 이동 확인: {final_url}")
 
-            await page.screenshot(path='screenshots/test_57_success.png')
+            await page.screenshot(path='screenshots/test_SEARCH_005_success.png')
             print("AUTOMATION_SUCCESS")
             return True
 
         except Exception as e:
-            await page.screenshot(path='screenshots/test_57_failed.png')
+            await page.screenshot(path='screenshots/test_SEARCH_005_failed.png')
             print(f"AUTOMATION_FAILED: {e}")
             raise
 
