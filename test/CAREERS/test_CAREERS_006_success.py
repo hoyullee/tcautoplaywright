@@ -28,9 +28,11 @@ async def test_main():
             dialog = page.locator('[role="dialog"]', has_text="근무지")
             await dialog.wait_for(state='visible', timeout=15000)
 
-            # "나중에 하기" 버튼 클릭
-            later_button = dialog.get_by_role('button', name='나중에 하기')
-            await later_button.click()
+            # "X" 닫기 버튼 클릭
+            close_button = dialog.locator('button[aria-label*="닫기"], button[aria-label*="close" i]').first
+            if await close_button.count() == 0:
+                close_button = dialog.locator('button:has(svg)').first
+            await close_button.click()
 
             # 팝업이 닫히는지 확인
             await dialog.wait_for(state='hidden', timeout=10000)
