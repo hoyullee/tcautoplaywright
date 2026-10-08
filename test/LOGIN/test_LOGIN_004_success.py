@@ -1,8 +1,14 @@
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from playwright.async_api import async_playwright
 import asyncio
 import os
 import pytest
+from ui_helpers import dismiss_optional_popups
+
+TEST_EMAIL = "hoyul.lee+1@wantedlab.com"
+TEST_PASSWORD = "wanted12!@"
 
 @pytest.mark.asyncio
 async def test_main():
@@ -18,119 +24,26 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 채용 홈 진입
+            # 사전조건: 로그인 상태로 채용 홈 진입
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)  # 검증 대상이 아닌 팝업 정리
 
-            # GNB 영역에서 프로필 아이콘 찾기
-            profile_icon = None
+            # 확인사항 1: GNB 영역 - 프로필 아이콘 노출 확인
+            profile_icon = page.get_by_role('link', name='MY 원티드')
+            await profile_icon.wait_for(state='visible', timeout=10000)
 
-            # 방법 1: aria-label로 프로필 버튼 찾기
-            for selector in [
-                '[aria-label="내 프로필"]',
-                '[aria-label="프로필"]',
-                '[aria-label="마이페이지"]',
-                'button[class*="profile"]',
-                '[class*="UserAvatar"]',
-                '[class*="userAvatar"]',
-            ]:
-                try:
-                    el = page.locator(selector).first
-                    if await el.is_visible():
-                        profile_icon = el
-                        break
-                except:
-                    pass
+            # 확인사항 2: 프로필 아이콘 선택
+            await profile_icon.click()
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(1000)
 
-            # 방법 2: GNB 내 버튼들 중 프로필 관련 요소 탐색
-            if not profile_icon:
-                gnb_btns = await page.locator('header button, nav button').all()
-                for btn in gnb_btns:
-                    try:
-                        label = await btn.get_attribute('aria-label') or ''
-                        class_name = await btn.get_attribute('class') or ''
-                        if any(k in label.lower() for k in ['프로필', 'profile', 'mypage', '마이']) or \
-                           any(k in class_name.lower() for k in ['profile', 'avatar', 'user']):
-                            if await btn.is_visible():
-                                profile_icon = btn
-                                break
-                    except:
-                        pass
+            # 기대결과: 프로필 페이지 진입 확인
+            assert 'social.wanted.co.kr/my/profile' in page.url, \
+                f"프로필 페이지로 진입하지 못함, 현재 URL: {page.url}"
 
-            # 방법 3: 헤더 내 이미지 아바타 요소
-            if not profile_icon:
-                for sel in [
-                    'header img[alt*="profile"]',
-                    'header img[alt*="프로필"]',
-                    'header [class*="Avatar"]',
-                    'header [class*="avatar"]',
-                    'nav [class*="avatar"]',
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.is_visible():
-                            profile_icon = el
-                            break
-                    except:
-                        pass
-
-            # 방법 4: JS로 헤더 내 프로필 링크 탐색
-            if not profile_icon:
-                profile_href = await page.evaluate("""() => {
-                    const links = [...document.querySelectorAll('header a, nav a')];
-                    const profileLink = links.find(a =>
-                        a.href && (a.href.includes('/profile') || a.href.includes('/users/'))
-                    );
-                    return profileLink ? profileLink.getAttribute('href') : null;
-                }""")
-                if profile_href:
-                    profile_icon = page.locator(f'a[href="{profile_href}"]').first
-
-            assert profile_icon is not None, "프로필 아이콘을 GNB에서 찾을 수 없습니다"
-
-            # 프로필 아이콘 클릭 (오버레이 등으로 가려진 경우 force=True로 우회)
-            await profile_icon.scroll_into_view_if_needed()
-            await page.wait_for_timeout(500)
-            try:
-                await profile_icon.click(timeout=10000)
-            except Exception:
-                await profile_icon.click(force=True)
-            await page.wait_for_timeout(2000)
-
-            current_url = page.url
-            print(f"클릭 후 URL: {current_url}")
-
-            profile_page_entered = False
-
-            # 직접 프로필 페이지로 이동했는지 확인
-            if '/profile' in current_url or '/users/' in current_url or '/mypage' in current_url:
-                profile_page_entered = True
-                print(f"프로필 페이지로 직접 이동: {current_url}")
-            else:
-                # 드롭다운이 열렸다면 프로필 링크 찾아서 클릭
-                for sel in [
-                    'a[href*="/profile"]',
-                    'a[href*="/users/"]',
-                    '[role="menu"] a',
-                    '[class*="dropdown"] a',
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.is_visible():
-                            href = await el.get_attribute('href') or ''
-                            print(f"드롭다운에서 링크 발견: {href}")
-                            if '/profile' in href or '/users/' in href or '/mypage' in href:
-                                await el.click()
-                                await page.wait_for_load_state('domcontentloaded')
-                                current_url = page.url
-                                if '/profile' in current_url or '/users/' in current_url or '/mypage' in current_url:
-                                    profile_page_entered = True
-                                    print(f"프로필 페이지로 이동: {current_url}")
-                                break
-                    except:
-                        pass
-
-            assert profile_page_entered, f"프로필 페이지 진입 실패. 현재 URL: {current_url}"
+            profile_menu = page.get_by_role('listitem', name='프로필')
+            await profile_menu.wait_for(state='visible', timeout=10000)
 
             await page.screenshot(path='screenshots/test_LOGIN_004_success.png')
             print("AUTOMATION_SUCCESS")
