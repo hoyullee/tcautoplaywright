@@ -30,6 +30,9 @@ class CaseRecord:
     expected: str = ''           # 기대결과
     attempts: int = 1            # 총 실행 시도 횟수
     retry_reasons: list = field(default_factory=list)   # 재시도를 유발한 사유(요약)
+    attempt_durations: list = field(default_factory=list)  # 회차별 실행 시간(초)
+    regen_duration: float = 0.0  # 재설계(스크립트 재생성)에 쓴 시간(초)
+    rerun_duration: float = 0.0  # 재설계 후 재실행에 쓴 시간(초)
     regenerated: bool = False    # 재설계(스크립트 재생성) 시도 여부
     regen_trigger: str = ''      # 재설계를 유발한 사유(요약)
     regen_built: bool = False    # 재설계 스크립트 생성 성공 여부
