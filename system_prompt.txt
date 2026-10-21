@@ -136,7 +136,7 @@ await dismiss_optional_popups(page)   # 검증 대상이 아닌 팝업 정리
 
 **헬퍼에 아직 등록되지 않은 새 팝업을 만난 경우**
 1. `ui_helpers.py` 의 `POPUPS` 목록에 한 줄 추가한다
-   `{'name': '팝업 이름', 'has_text': '식별 텍스트', 'button': '닫기 버튼 이름'}`
+   `{'name': '팝업 이름', 'has_text': '식별 텍스트', 'buttons': ('닫기 버튼 이름',)}`
 2. 스크립트에는 `dismiss_optional_popups(page)` 호출만 남긴다
 3. 스크립트 안에 개별 닫기 코드를 남기지 않는다
 

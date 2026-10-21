@@ -23,12 +23,16 @@
 # 검증 대상이 아닐 때 닫아야 하는 팝업 목록.
 #   name    : 실행 리포트에 표시되는 이름
 #   has_text: [role="dialog"] 안에서 이 팝업을 식별하는 텍스트
-#   button  : 닫기 위해 누를 버튼 이름
+#   buttons : 닫기 위해 누를 버튼 이름 후보. 앞에서부터 화면에 있는 것을 누른다.
 #
 # 새 팝업이 생기면 여기에 한 줄만 추가한다. 호출하는 스크립트는 고치지 않아도 된다.
 # 기능이 없어져 더 이상 뜨지 않는 항목은 전체 실행 요약의 '미발동' 경고로 확인하고 지운다.
+#   frame / close_selector : iframe 안에 뜨는 팝업(Braze 인앱 메시지 등)용. frame 은 iframe 선택자,
+#                            close_selector 는 iframe 안의 닫기 요소 선택자.
 POPUPS = (
-    {'name': '희망 근무지 설정', 'has_text': '근무지', 'button': '나중에 하기'},
+    {'name': '이직 챌린지 인앱 메시지', 'frame': 'iframe.ab-in-app-message', 'close_selector': '.close'},
+    # '나중에 하기' 버튼이 빠지고 우상단 X(Close dialog)만 남은 버전이 있어 둘 다 시도한다
+    {'name': '희망 근무지 설정', 'has_text': '근무지', 'buttons': ('나중에 하기', 'Close dialog')},
 )
 
 POPUP_NAMES = tuple(p['name'] for p in POPUPS)
@@ -47,6 +51,17 @@ async def dismiss_optional_popups(page, timeout=3000):
     timeout: 팝업 하나당 기다리는 시간(ms). 기본 3초.
     """
     for popup in POPUPS:
+        if 'frame' in popup:
+            host = page.locator(popup['frame'])
+            try:
+                await host.wait_for(state='visible', timeout=timeout)
+                await page.frame_locator(popup['frame']).locator(popup['close_selector']).first.click(timeout=timeout)
+                await host.wait_for(state='hidden', timeout=timeout)
+            except Exception:
+                continue  # 안 뜨는 게 정상일 수 있다
+            print(f"{DISMISS_MARKER} {popup['name']}")
+            continue
+
         dialog = page.locator('[role="dialog"]', has_text=popup['has_text'])
         try:
             await dialog.wait_for(state='visible', timeout=timeout)
@@ -54,7 +69,10 @@ async def dismiss_optional_popups(page, timeout=3000):
             continue  # 안 뜨는 게 정상일 수 있다
 
         try:
-            button = dialog.get_by_role('button', name=popup['button'])
+            for name in popup['buttons']:
+                button = dialog.get_by_role('button', name=name, exact=True)
+                if await button.count():
+                    break
             await button.click()
             await dialog.wait_for(state='hidden', timeout=timeout)
         except Exception as e:

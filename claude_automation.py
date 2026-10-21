@@ -74,14 +74,19 @@ def is_popup_under_test(test_case):
     이런 케이스에 공용 헬퍼를 쓰면 검증 대상이 먼저 닫혀 버리므로 제외해야 한다.
     """
     text = ' '.join(str(test_case.get(k, '')) for k in ('확인사항', '기대결과', '기능영역'))
-    return any(p['has_text'] in text for p in POPUPS)
+    return any(p.get('has_text', p['name']) in text for p in POPUPS)
+
+
+def _describe_popup(p):
+    if 'frame' in p:
+        return f"  - {p['name']} (iframe '{p['frame']}', 닫기 요소 '{p['close_selector']}')"
+    buttons = ' 또는 '.join(repr(b) for b in p['buttons'])
+    return f"  - {p['name']} (식별 텍스트 '{p['has_text']}', 닫기 버튼 {buttons})"
 
 
 def build_popup_instruction(test_case):
     """방해 팝업 처리에 대한 TC별 지시문. 등록된 팝업 목록을 함께 알려 준다."""
-    registered = '\n'.join(
-        f"  - {p['name']} (식별 텍스트 '{p['has_text']}', 닫기 버튼 '{p['button']}')"
-        for p in POPUPS) or '  - (등록된 팝업 없음)'
+    registered = '\n'.join(_describe_popup(p) for p in POPUPS) or '  - (등록된 팝업 없음)'
 
     if is_popup_under_test(test_case):
         return f"""
@@ -375,6 +380,13 @@ def run_claude_code(prompt, test_case, max_attempts=3):
             shell=sys.platform == 'win32',
             env=env,
         )
+
+    # 설치되지 않은 경우 Windows cmd 가 cp949 로 오류를 내 UTF-8 로 읽으면 글자가 깨진다.
+    # 재시도해도 결과가 같으므로 호출 전에 확인하고 바로 알린다.
+    if shutil.which('claude') is None:
+        detail = "claude CLI가 설치되지 않았거나 PATH에 없음 (npm install -g @anthropic-ai/claude-code)"
+        logging.error(f"❌ [{tc_id}] {detail}")
+        return False, None, detail
 
     dropped_auth_env = False
 

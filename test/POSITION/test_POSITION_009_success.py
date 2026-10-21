@@ -36,21 +36,21 @@ async def test_main():
             card_count = await position_cards.count()
             print(f"포지션 카드 수: {card_count}")
 
+            # 상세 페이지로 이동하면 목록이 사라지므로 링크를 먼저 모아 둔다
+            hrefs = [h for h in await position_cards.evaluate_all('els => els.map(e => e.getAttribute("href"))') if h]
+            hrefs = list(dict.fromkeys(hrefs))
+
             apply_btn = None
             found_url = None
-            for i in range(min(card_count, 10)):
-                href = await position_cards.nth(i).get_attribute('href')
-                if not href:
-                    continue
+            for href in hrefs[:10]:
                 position_url = f"https://www.wanted.co.kr{href}"
                 await page.goto(position_url, timeout=30000)
                 await page.wait_for_load_state('domcontentloaded')
                 await page.wait_for_timeout(1500)
                 print(f"포지션 상세 페이지 URL: {page.url}")
 
-                btn = page.get_by_role('button', name='지원하기')
-                if await btn.count() == 0:
-                    btn = page.locator('button:has-text("지원하기")')
+                # exact=True — '기업 사이트에서 지원하기'(외부 지원) 버튼은 원티드 지원 모달이 없으므로 제외
+                btn = page.get_by_role('button', name='지원하기', exact=True)
                 if await btn.count() > 0:
                     apply_btn = btn
                     found_url = page.url

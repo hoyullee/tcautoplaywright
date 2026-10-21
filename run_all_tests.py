@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import threading
@@ -88,6 +89,8 @@ def _run_test(test_file):
         text=True,
         encoding='utf-8',
         errors='replace',
+        # Windows 기본 콘솔 인코딩(cp949)으로는 이모지를 출력할 수 없어 자식 프로세스 출력을 UTF-8로 고정
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
     )
 
 
