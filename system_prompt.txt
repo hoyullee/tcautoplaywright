@@ -113,6 +113,47 @@ await page.wait_for_timeout(500)
 await btn.click(force=True)
 ```
 
+### 고정 대기(wait_for_timeout) 사용 규칙 (반드시 준수)
+
+클릭/입력 같은 동작의 **결과**(내용 확장, 자동완성 노출, 입력값이 실제로 반영됐는지 등)를
+검증할 때 `wait_for_timeout(N)`으로 고정 시간만 기다렸다가 **그 순간 한 번만** 확인하는
+코드를 작성하지 말 것. 환경이 빠르면 불필요하게 느려지고, 느리면 그 타이밍에 못 미쳐
+실제로는 멀쩡한 케이스가 재시도로 넘어간다 (TC 전체를 처음부터 다시 돌리는 비용 발생).
+
+```python
+# 🚫 지양 — 고정 시간 후 단발 확인
+await btn.click()
+await page.wait_for_timeout(1500)
+is_expanded = await some_locator.count() == 0
+assert is_expanded, "..."
+```
+
+```python
+# ✅ 권장 — ui_helpers.poll_until 로 조건이 될 때까지 반복 확인
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import poll_until
+
+await btn.click()
+
+async def check_expanded():
+    return await some_locator.count() == 0
+
+is_expanded = await poll_until(check_expanded, timeout=4000, interval=300)
+assert is_expanded, "..."
+```
+
+- `poll_until(check, timeout, interval)`: `check`가 참을 반환하거나 코루틴이면 그 결과가
+  참이 될 때까지 `interval`(ms) 간격으로 재확인하고, `timeout`(ms) 안에 못 만족하면
+  `False`를 반환한다. 조건이 되는 즉시 끝나므로 빠른 환경에서 느려지지 않는다.
+- 자동완성 드롭다운 클릭처럼 "조건 확인 + 액션"이 한 묶음이면, `check` 함수 안에서
+  클릭까지 수행하고 성공 시 `True`를 반환해도 된다.
+- **예외**: 확인할 DOM 신호가 전혀 없는 순수 애니메이션/전환 대기(예: 스크롤 직후
+  지연 렌더링을 유도하기 위한 짧은 pad)는 `wait_for_timeout`을 그대로 써도 되지만,
+  1초를 넘기지 않는다. 그 다음 동작은 반드시 조건 대기(`locator.wait_for(state=...)`
+  등)로 감싼다.
+
 ### 방해 팝업 처리 규칙 (반드시 준수)
 
 검증 대상이 **아닌** 팝업·모달·배너가 화면을 가려 클릭이 막히는 경우가 있다.

@@ -13,12 +13,15 @@
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from ui_helpers import dismiss_optional_popups
+    from ui_helpers import dismiss_optional_popups, poll_until
 
     await page.goto('https://www.wanted.co.kr/wdlist', timeout=30000)
     await page.wait_for_load_state('domcontentloaded')
     await dismiss_optional_popups(page)
 """
+
+import asyncio
+import time
 
 # 검증 대상이 아닐 때 닫아야 하는 팝업 목록.
 #   name    : 실행 리포트에 표시되는 이름
@@ -81,3 +84,32 @@ async def dismiss_optional_popups(page, timeout=3000):
             continue
 
         print(f"{DISMISS_MARKER} {popup['name']}")
+
+
+async def poll_until(check, timeout=3000, interval=200):
+    """조건이 참이 될 때까지 짧은 간격으로 재확인한다.
+
+    '고정 시간만큼 기다렸다가 한 번만 확인'하는 패턴은 두 방향으로 깨진다.
+    환경이 빠르면 불필요하게 기다리고, 느리면 그 한 번의 확인 타이밍에 못 미쳐
+    (실제로는 멀쩡한데도) 재시도로 이어진다. 이 함수는 조건이 만족되는 즉시
+    돌아오고, 느릴 때는 timeout 안에서 여러 번 재확인한다.
+
+    check   : () -> bool (또는 그 코루틴)을 반환하는 호출 가능 객체.
+              예외가 나면 아직 조건이 안 된 것으로 보고 계속 재시도한다.
+    timeout : 총 대기 시간 상한(ms)
+    interval: 재확인 간격(ms)
+    반환값  : 조건이 참이 되면 True, timeout 안에 만족 못 하면 False
+    """
+    deadline = time.monotonic() + timeout / 1000
+    while True:
+        try:
+            result = check()
+            if asyncio.iscoroutine(result):
+                result = await result
+            if result:
+                return True
+        except Exception:
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(interval / 1000)

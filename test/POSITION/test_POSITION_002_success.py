@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from ui_helpers import dismiss_optional_popups
+from ui_helpers import dismiss_optional_popups, poll_until
 import sys
 from playwright.async_api import async_playwright
 import asyncio
@@ -125,64 +125,45 @@ async def test_main():
             await btn.scroll_into_view_if_needed()
             await page.wait_for_timeout(300)
             await btn.click()
-            await page.wait_for_timeout(1500)
             print("Clicked '상세 정보 더 보기' button")
 
             # 클릭 후 추가 내용 노출 확인
-            content_expanded = False
+            # 공고마다 확장 애니메이션/렌더링 속도가 달라 고정 시간 한 번만 보고
+            # 판정하면(예: 1.5초 대기 후 단발 확인) 느린 공고에서 재시도가 발생한다.
+            # 조건이 만족되는 즉시 끝나고, 느릴 때는 timeout 안에서 반복 확인한다.
+            async def check_expanded():
+                # 방법 1: 버튼이 사라지거나 변경되었는지 확인
+                btn_text_after = page.get_by_text('상세 정보 더 보기')
+                if await btn_text_after.count() == 0:
+                    print("Button disappeared - content expanded")
+                    return True
 
-            # 방법 1: 버튼이 사라지거나 변경되었는지 확인
-            try:
-                # 버튼이 사라졌다면 내용이 확장된 것
-                btn_after = page.get_by_role('button', name='상세 정보 더 보기')
-                is_hidden = await btn_after.is_hidden()
-                if is_hidden:
-                    print("Button is now hidden - content expanded")
-                    content_expanded = True
-            except Exception:
-                pass
-
-            if not content_expanded:
-                try:
-                    btn_text_after = page.get_by_text('상세 정보 더 보기')
-                    count = await btn_text_after.count()
-                    if count == 0:
-                        print("Button disappeared - content expanded")
-                        content_expanded = True
-                except Exception:
-                    pass
-
-            # 방법 2: 콘텐츠 높이가 증가했는지 확인
-            if not content_expanded:
+                # 방법 2: 콘텐츠 높이가 증가했는지 확인
                 content_height_after = await page.evaluate("""() => {
                     const detailSection = document.querySelector('[class*="JobDescription"]') ||
                                           document.querySelector('[class*="content"]') ||
                                           document.querySelector('main');
                     return detailSection ? detailSection.scrollHeight : document.body.scrollHeight;
                 }""")
-                print(f"Content height after click: {content_height_after}")
                 if content_height_after > content_height_before:
-                    print("Content height increased - additional content is displayed")
-                    content_expanded = True
+                    print(f"Content height increased - additional content is displayed ({content_height_after})")
+                    return True
 
-            # 방법 3: 페이지 전체 높이 증가 확인
-            if not content_expanded:
+                # 방법 3: 페이지 전체 높이 증가 확인
                 page_height_after = await page.evaluate('document.body.scrollHeight')
-                page_height_before_val = content_height_before
-                if page_height_after > page_height_before_val:
-                    content_expanded = True
+                if page_height_after > content_height_before:
                     print("Page height increased after click")
+                    return True
 
-            # 방법 4: '접기' 또는 '간략히' 버튼 등 토글 버튼이 나타났는지 확인
-            if not content_expanded:
-                try:
-                    collapse_btn = page.get_by_role('button', name='접기')
-                    await collapse_btn.wait_for(state='visible', timeout=3000)
+                # 방법 4: '접기' 또는 '간략히' 버튼 등 토글 버튼이 나타났는지 확인
+                collapse_btn = page.get_by_role('button', name='접기')
+                if await collapse_btn.count() > 0:
                     print("Found '접기' button - content expanded")
-                    content_expanded = True
-                except Exception:
-                    pass
+                    return True
 
+                return False
+
+            content_expanded = await poll_until(check_expanded, timeout=5000, interval=300)
             assert content_expanded, "버튼 클릭 후 포지션 상세 내용이 추가 노출되지 않았습니다"
             print("AUTOMATION_SUCCESS: 포지션 상세 내용 추가 노출 확인 완료")
 

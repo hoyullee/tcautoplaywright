@@ -1,4 +1,7 @@
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import poll_until
 from playwright.async_api import async_playwright
 import asyncio
 import os
@@ -75,7 +78,6 @@ async def test_main():
                 await company_input.click()
                 await page.wait_for_timeout(500)
                 await company_input.fill("원티드랩")
-                await page.wait_for_timeout(2000)  # 자동완성 대기
 
                 # 자동완성 드롭다운 확인 및 클릭
                 suggestion_selectors = [
@@ -88,22 +90,28 @@ async def test_main():
                 ]
 
                 suggestion_clicked = False
-                for sel in suggestion_selectors:
-                    try:
-                        sug = page.locator(sel)
-                        cnt = await sug.count()
-                        if cnt > 0:
+
+                async def try_click_suggestion():
+                    nonlocal suggestion_clicked
+                    for sel in suggestion_selectors:
+                        try:
+                            sug = page.locator(sel)
+                            cnt = await sug.count()
                             for i in range(min(cnt, 3)):
                                 if await sug.nth(i).is_visible():
                                     await sug.nth(i).click()
                                     suggestion_clicked = True
                                     print(f"자동완성 선택: {sel}")
-                                    await page.wait_for_timeout(800)
-                                    break
-                    except Exception:
-                        pass
-                    if suggestion_clicked:
-                        break
+                                    return True
+                        except Exception:
+                            pass
+                    return False
+
+                # 드롭다운이 뜨는 시점은 입력 속도/네트워크에 따라 달라지므로
+                # 고정 시간만 기다렸다가 한 번만 확인하지 않고, 뜨는 즉시 클릭한다.
+                await poll_until(try_click_suggestion, timeout=2500, interval=200)
+                if suggestion_clicked:
+                    await page.wait_for_timeout(800)
 
                 if not suggestion_clicked:
                     # Tab으로 커밋 (Escape는 search input 초기화 가능성 있음)
@@ -430,10 +438,18 @@ async def test_main():
                 print("⚠️ 주요 성과 상세 textarea를 찾을 수 없음")
 
             # ===== 최종 검증 (Escape 키 누르지 않음) =====
-            await page.wait_for_timeout(1000)
+            # fill 직후 React 상태 반영이 살짝 늦게 끝나는 경우가 있어, 고정 시간
+            # 한 번 기다렸다가 단발로 읽지 않고 값이 채워질 때까지 짧게 재확인한다.
 
             # 회사명 확인
-            final_company = await company_input.input_value()
+            final_company = ""
+
+            async def check_company():
+                nonlocal final_company
+                final_company = await company_input.input_value()
+                return len(final_company) > 0
+
+            await poll_until(check_company, timeout=2000, interval=200)
             print(f"최종 회사명: '{final_company}'")
             assert len(final_company) > 0, f"회사명이 비어있습니다 ('{final_company}')"
             print(f"✅ 회사명 확인: '{final_company}'")
@@ -441,7 +457,14 @@ async def test_main():
             # 주요 성과 확인
             ach_final_input = page.locator('input[placeholder*="주요 성과"]').first
             if await ach_final_input.count() > 0 and await ach_final_input.is_visible():
-                final_ach = await ach_final_input.input_value()
+                final_ach = ""
+
+                async def check_ach():
+                    nonlocal final_ach
+                    final_ach = await ach_final_input.input_value()
+                    return len(final_ach) > 0
+
+                await poll_until(check_ach, timeout=2000, interval=200)
                 print(f"✅ 주요 성과: '{final_ach}'")
                 assert len(final_ach) > 0, "주요 성과가 비어있습니다"
             else:
@@ -449,14 +472,20 @@ async def test_main():
 
             # 주요 성과 상세 확인
             final_detail_val = ""
-            if achievement_detail is not None:
-                final_detail_val = await achievement_detail.input_value()
-            else:
-                for sel in detail_selectors:
-                    ta = page.locator(sel)
-                    if await ta.count() > 0 and await ta.first.is_visible():
-                        final_detail_val = await ta.first.input_value()
-                        break
+
+            async def check_detail():
+                nonlocal final_detail_val
+                if achievement_detail is not None:
+                    final_detail_val = await achievement_detail.input_value()
+                else:
+                    for sel in detail_selectors:
+                        ta = page.locator(sel)
+                        if await ta.count() > 0 and await ta.first.is_visible():
+                            final_detail_val = await ta.first.input_value()
+                            break
+                return len(final_detail_val) > 0
+
+            await poll_until(check_detail, timeout=2000, interval=200)
             print(f"✅ 주요 성과 상세: '{final_detail_val[:50]}'")
             assert len(final_detail_val) > 0, "주요 성과 상세가 비어있습니다"
 
