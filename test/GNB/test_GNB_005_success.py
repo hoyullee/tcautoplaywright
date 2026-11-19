@@ -3,6 +3,9 @@ from playwright.async_api import async_playwright
 import asyncio
 import os
 import pytest
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
 
 @pytest.mark.asyncio
 async def test_main():
@@ -21,10 +24,12 @@ async def test_main():
             # 채용 홈 접속 (로그인 상태)
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)
 
             # GNB에서 이력서 항목 클릭
             resume_link = page.get_by_role('link', name='이력서')
             await resume_link.first.click()
+            await page.wait_for_url('**/cv/list**', timeout=15000)
             await page.wait_for_load_state('domcontentloaded')
 
             # 이력서 페이지(로그인: /cv/list) 진입 확인

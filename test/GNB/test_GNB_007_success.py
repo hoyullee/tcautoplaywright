@@ -1,8 +1,13 @@
 import sys
+from pathlib import Path
 from playwright.async_api import async_playwright
 import asyncio
 import os
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
+
 
 @pytest.mark.asyncio
 async def test_main():
@@ -17,19 +22,19 @@ async def test_main():
         try:
             os.makedirs('screenshots', exist_ok=True)
 
-            # 채용 홈 접속 (비로그인 상태)
-            await page.goto('https://www.wanted.co.kr/', timeout=60000, wait_until='domcontentloaded')
-            await page.wait_for_timeout(2000)
+            # 채용 홈 접속 (비로그인)
+            await page.goto('https://www.wanted.co.kr/', timeout=30000)
+            await page.wait_for_load_state('domcontentloaded')
+            await dismiss_optional_popups(page)
 
-            # GNB에서 '콘텐츠' 항목 클릭 (href에 /events 포함된 링크)
-            contents_link = page.locator('a[href*="/events"]').first
-            await contents_link.click(timeout=15000)
-            await page.wait_for_load_state('domcontentloaded', timeout=30000)
+            # GNB 콘텐츠 탭 선택
+            content_link = page.get_by_role('link', name='콘텐츠', exact=True).first
+            await content_link.wait_for(state='visible', timeout=15000)
+            await content_link.click()
 
-            # 콘텐츠 페이지 URL 확인
-            current_url = page.url
-            assert 'wanted.co.kr/events' in current_url, \
-                f"콘텐츠 페이지 URL이 아닙니다. 현재 URL: {current_url}"
+            await page.wait_for_url('**/events**', timeout=30000)
+            await page.wait_for_load_state('domcontentloaded')
+            assert '/events' in page.url, f"콘텐츠 페이지 진입 실패: {page.url}"
 
             await page.screenshot(path='screenshots/test_GNB_007_success.png')
             print("AUTOMATION_SUCCESS")

@@ -3,6 +3,9 @@ from playwright.async_api import async_playwright
 import asyncio
 import os
 import pytest
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from ui_helpers import dismiss_optional_popups
 
 @pytest.mark.asyncio
 async def test_main():
@@ -21,14 +24,17 @@ async def test_main():
             await page.goto('https://www.wanted.co.kr/', timeout=30000)
             await page.wait_for_load_state('domcontentloaded')
 
+            await dismiss_optional_popups(page)
+
             # GNB에서 이력서 항목 클릭
             resume_link = page.get_by_role('link', name='이력서')
             await resume_link.first.click()
+            await page.wait_for_url('**/cv/intro**', timeout=15000)
             await page.wait_for_load_state('domcontentloaded')
 
             # 이력서 페이지 진입 확인 (비로그인: /cv/intro, 로그인: /cv/list)
             current_url = page.url
-            assert 'cv/intro' in current_url or 'cv/list' in current_url, \
+            assert 'cv/intro' in current_url, \
                 f"이력서 페이지 진입 실패: {current_url}"
 
             await page.screenshot(path='screenshots/test_GNB_004_success.png')
